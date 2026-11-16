@@ -91,7 +91,7 @@
         return null;
       }
       if (this.phase !== "play" || G.P[G.cur] !== p || this.busy || G.winner) return "ยังไม่ใช่ตาคุณ";
-      if (a.t === "end") { G.endTurn(); await this.nextTurn(); return null; }
+      if (a.t === "end") { const must = G.mustAttackErr(p); if (must) return must; G.endTurn(); await this.nextTurn(); return null; }
       this.busy = true; this.push();
       let err = null;
       try {

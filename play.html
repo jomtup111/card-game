@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>เกมการ์ด 9 เผ่า</title>
+<title>Battle of Banmo</title>
 <link rel="icon" href="img/ui_logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -175,6 +175,7 @@
   .logo img { width: 150px; height: 126px; animation: bob 3s ease-in-out infinite; }
   .logo h1 { margin: 0; font-size: 40px; font-weight: 600; line-height: 1.1; color: var(--hi);
              text-shadow: 0 3px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink), 3px 3px 0 #7a4a20; }
+  .logo h1 .gname { font-family: "Press Start 2P", monospace; font-size: 34px; letter-spacing: 1px; display: block; margin-bottom: 8px; }
   .logo h1 small { display: block; font-size: 15px; color: var(--fg); font-weight: 400; text-shadow: 0 2px 0 var(--ink); }
   @keyframes bob { 50% { transform: translateY(-6px); } }
   .mascots { display: flex; gap: 4px; margin: 10px 0 6px; flex-wrap: wrap; justify-content: center; }
@@ -200,7 +201,7 @@
   }
   @media (max-width: 640px) {
     .menu { grid-template-columns: 1fr; }
-    .logo h1 { font-size: 28px; } .logo img { width: 96px; height: 80px; }
+    .logo h1 { font-size: 28px; } .logo h1 .gname { font-size: 17px; } .logo img { width: 96px; height: 80px; }
     .mascots img { width: 34px; }
     .row { gap: 4px; } .field { border-width: 8px; border-image-width: 8px; padding: 2px; }
     .bar { gap: 6px; font-size: 12px; } .hearts img { width: 16px; height: 13px; }
@@ -238,7 +239,7 @@
 </div>
 
 <div id="title">
-  <div class="logo"><img src="img/ui_logo.png" alt=""><h1>เกมการ์ด 9 เผ่า<small>ทิ้งการ์ดเป็น gem · อัญเชิญ · ตีให้ HP ศัตรูหมด</small></h1></div>
+  <div class="logo"><img src="img/ui_logo.png" alt=""><h1><span class="gname">Battle of Banmo</span><small>เกมการ์ด 9 เผ่า · ทิ้งการ์ดเป็น gem · อัญเชิญ · ตีให้ HP ศัตรูหมด</small></h1></div>
   <div class="mascots" id="mascots"></div>
   <div class="menu">
     <div class="panel wide">
