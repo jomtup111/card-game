@@ -12,7 +12,11 @@
     // o: { cards: [Card], decks: [สาย, สาย], names, seats, seed, onView(i, view), onLog(s), ask(i, payload) → Promise<ตำแหน่งตัวเลือก|null>, botDelay }
     constructor(o) {
       Object.assign(this, { botDelay: 600, watch: false }, o);
-      this.G = new E.Game(E.buildDeck(o.cards, o.decks[0]), E.buildDeck(o.cards, o.decks[1]), o.seed, (s) => this.onLog(s));
+      // เดค: ชื่อสาย (จัดอัตโนมัติ) | { arch } | { name, ids: [รหัสการ์ด] } (จัดเอง ต้องผ่าน validateDeck มาแล้ว)
+      const byId = new Map(o.cards.map((c) => [c.id, c]));
+      const mk = (d) => (d && d.ids ? d.ids.map((id) => byId.get(id)) : E.buildDeck(o.cards, typeof d === "string" ? d : d.arch));
+      this.deckNames = o.decks.map((d) => (typeof d === "string" ? d : d.arch || d.name || "เดคจัดเอง"));
+      this.G = new E.Game(mk(o.decks[0]), mk(o.decks[1]), o.seed, (s) => this.onLog(s));
       this.G.P.forEach((p, i) => (p.name = o.names[i]));
       this.fxq = []; this.G.onFx = (e) => this.fxq.push(e);
       this.phase = "mull"; this.mullDone = [false, false]; this.busy = false;
@@ -68,9 +72,9 @@
       return {
         seat: i, phase: this.phase, mullDone: this.mullDone[i], turn: G.turn, myTurn: my, busy: this.busy,
         whoseTurn: G.P[G.cur].name, winner: G.winner ? (G.winner === p ? "me" : "opp") : null,
-        me: { name: p.name, arch: this.decks[i], hp: p.hp, deck: p.deck.length, grave: p.grave.map((c) => c.name), hand,
+        me: { name: p.name, arch: this.deckNames[i], hp: p.hp, deck: p.deck.length, grave: p.grave.map((c) => c.name), hand,
               field: p.field.map((x) => unit(p, x, true)), spellUsed: p.spellUsed, spellMax: p.spellMax },
-        opp: { name: e.name, arch: this.decks[1 - i], hp: e.hp, deck: e.deck.length, grave: e.grave.map((c) => c.name), handCount: e.hand.length,
+        opp: { name: e.name, arch: this.deckNames[1 - i], hp: e.hp, deck: e.deck.length, grave: e.grave.map((c) => c.name), handCount: e.hand.length,
                field: e.field.map((x) => unit(e, x, false)) },
       };
     }

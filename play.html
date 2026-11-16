@@ -90,6 +90,48 @@
   .opp-hand { display: inline-flex; gap: 2px; }
   .opp-hand i { width: 14px; height: 20px; background: url(img/ui_deck.png) center / 100% 100% no-repeat; }
   #paybox { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+  .opp-hand b { margin-left: 4px; font-family: "Press Start 2P"; font-size: 13px; color: #fff; }
+
+  /* ---------- หน้าจัดเดค ---------- */
+  #builder { position: fixed; inset: 0; z-index: 16; display: grid; grid-template-columns: 1fr 340px; gap: 8px; padding: 8px;
+             background: url(img/ui_table.png) 0 0 / 192px 144px; }
+  #builder[hidden] { display: none; }
+  .bleft { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
+  .bfilters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 0 4px; }
+  .bfilters input { flex: 1 1 160px; } .bfilters select { flex: 0 1 auto; max-width: 180px; }
+  #bgrid { flex: 1; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 10px; align-content: flex-start; justify-content: center; padding: 12px 4px; }
+  #bgrid .card { --s: 1.7; }
+  #bgrid .card .incount { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font-family: "Press Start 2P"; font-size: 18px; color: var(--hi);
+                          background: #1b1630e0; padding: 6px 8px; pointer-events: none; }
+  #bgrid .card.maxed { filter: grayscale(.6) brightness(.8); }
+  #bmore { align-self: center; }
+  #bdeck { display: flex; flex-direction: column; min-height: 0; padding: 0 4px; }
+  #bdeck h3 { margin: 0 0 6px; color: var(--hi); font-size: 17px; text-shadow: 0 2px 0 var(--ink); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  #bdeck label { display: flex; gap: 6px; align-items: center; margin: 4px 0; } #bdeck label input, #bdeck label select { flex: 1; min-width: 0; }
+  #dcount { font-family: "Press Start 2P"; font-size: 14px; } #dcount.ok { color: var(--ok); }
+  #dstats { font-size: 12.5px; color: var(--dim); margin: 2px 0 6px; }
+  #dlist { flex: 1; overflow-y: auto; margin: 4px 0; background: #0003; padding: 2px; }
+  .drow { display: flex; align-items: center; gap: 6px; padding: 2px 4px; font-size: 13px; cursor: pointer; }
+  .drow:nth-child(odd) { background: #ffffff0a; }
+  .drow .dc { width: 22px; height: 22px; flex: none; display: flex; align-items: center; justify-content: center; font-family: "Press Start 2P"; font-size: 9px;
+              background: url(img/badge_cost.png) center / 100% 100%; color: #fff; text-shadow: 0 1px 0 var(--ink), 1px 0 0 var(--ink), -1px 0 0 var(--ink), 0 -1px 0 var(--ink); }
+  .drow .dc.spell { background: none; color: var(--dim); text-shadow: none; font-family: inherit; font-size: 11px; }
+  .drow .dn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drow .dk { font-family: "Press Start 2P"; font-size: 10px; color: var(--hi); }
+  .drow button { min-height: 0; padding: 0 6px; border-width: 6px; border-image-width: 6px; line-height: 1; }
+  #bdeck .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; } #bdeck .btns button { flex: 1 1 45%; }
+  #bmsg { min-height: 20px; color: var(--hi); font-size: 13px; text-align: center; }
+  #bmsg.err { color: #ff9aa6; }
+  #bdecktoggle { display: none; }
+  .deckrow { display: flex; gap: 8px; align-items: center; } .deckrow select { flex: 1; min-width: 0; }
+  @media (max-width: 799px) {
+    #builder { grid-template-columns: 1fr; padding: 4px; }
+    #bgrid .card { --s: 1.25; } #bgrid { gap: 6px; }
+    #bdeck { position: fixed; left: 4px; right: 4px; bottom: 4px; max-height: 70vh; z-index: 2; transform: translateY(calc(100% - 64px)); transition: transform .2s; }
+    #bdeck.open { transform: none; }
+    #bdecktoggle { display: inline-block; }
+    .bleft { padding-bottom: 64px; }
+  }
 
   #side { display: flex; flex-direction: column; overflow: hidden; margin: 8px 8px 8px 0; }
   #preview { display: flex; justify-content: center; padding: 6px; min-height: calc(96px * 3.4 + 12px); }
@@ -201,7 +243,7 @@
   <div class="menu">
     <div class="panel wide">
       <label><span>ชื่อ</span><input id="myname" maxlength="16" placeholder="ผู้เล่น"></label>
-      <label><span>เดค</span><select id="mydeck"></select></label>
+      <label><span>เดค</span><span class="deckrow" style="flex:1"><select id="mydeck"></select><button id="openbuilder">จัดเดค</button></span></label>
     </div>
     <div class="panel">
       <h3>เล่นกับบอท</h3>
@@ -218,6 +260,31 @@
       เดค 50 ใบจัดอัตโนมัติจากสายที่เลือก · HP 5 · จั่วเริ่ม 5 · เทิร์นแรกของเกมโจมตีไม่ได้<br>
       <b>อัญเชิญ:</b> แตะมอนในมือ → เลือกการ์ดที่จะทิ้งจ่าย gem → กดอัญเชิญ · <b>โจมตี:</b> แตะมอนที่เรืองเขียว → แตะเป้าหมายที่ขอบแดง<br>
       <b>เวทปกติ:</b> แตะที่การ์ด · <b>เวทสวน:</b> เกมจะถามตอนถูกโจมตี · <b>ดูการ์ดขยาย:</b> ชี้เมาส์ หรือกดค้างบนมือถือ
+    </div>
+  </div>
+</div>
+
+<div id="builder" hidden>
+  <div class="bleft">
+    <div class="bfilters panel">
+      <input id="fq" placeholder="ค้นหาชื่อ / สกิล">
+      <select id="frace"></select><select id="farch"></select><select id="ftype"></select><select id="fcost"></select>
+      <button id="bclose">กลับ</button>
+    </div>
+    <div id="bgrid"></div>
+    <button id="bmore">แสดงเพิ่ม</button>
+  </div>
+  <div id="bdeck" class="panel">
+    <h3><span>เดคของฉัน <span id="dcount"></span></span><button id="bdecktoggle">เปิด/ปิด</button></h3>
+    <label>เดคที่บันทึก <select id="dsaved"></select></label>
+    <label>ชื่อเดค <input id="dname" maxlength="24" placeholder="ตั้งชื่อเดค"></label>
+    <div id="dstats"></div>
+    <div id="bmsg"></div>
+    <div id="dlist"></div>
+    <div class="btns">
+      <button class="main" id="dsave">บันทึก</button><button id="dnew">เดคใหม่</button>
+      <button id="dfill">เริ่มจากสาย…</button><button id="dcode">คัดลอกรหัส</button>
+      <button id="dimport">นำเข้ารหัส</button><button id="ddelete">ลบเดคนี้</button>
     </div>
   </div>
 </div>
@@ -407,7 +474,8 @@ function render() {
   $("ename").textContent = V.opp.name; $("mname").textContent = V.me.name;
   $("ehp").innerHTML = hearts(V.opp.hp); $("mhp").innerHTML = hearts(V.me.hp);
   $("ehp").title = `HP ${V.opp.hp}`; $("mhp").title = `HP ${V.me.hp}`;
-  $("ehand").innerHTML = "<i></i>".repeat(V.opp.handCount);
+  $("ehand").innerHTML = "<i></i>".repeat(Math.min(V.opp.handCount, 8)) + `<b class="px-text">${V.opp.handCount}</b>`;
+  $("ehand").title = `การ์ดในมือ ${V.opp.name}: ${V.opp.handCount} ใบ`;
   for (const [side, d, g] of [[V.me, "mdeck", "mgrave"], [V.opp, "edeck", "egrave"]]) {
     $(d).innerHTML = `<img src="img/ui_deck.png" alt="">${side.deck}`; $(d).title = "เดค";
     $(g).innerHTML = `<img src="img/ui_grave.png" alt="">${side.grave.length}`; $(g).title = "สุสาน:\n" + (side.grave.join("\n") || "ว่าง");
@@ -518,12 +586,31 @@ function askModal(p) {
   });
 }
 function gameOver() {
+  if (role === "host" || role === "guest") return gameOverOnline();
   const m = document.createElement("div"); m.className = "modal";
   m.innerHTML = `<div class="box panel" style="text-align:center"><h2 class="px-text" style="font-size:30px">${V.winner === "me" ? "🏆 คุณชนะ!" : "💀 คุณแพ้"}</h2><p>จบที่เทิร์น ${V.turn}</p>
     <div class="btns"><button class="main" id="again">${role === "bot" ? "เล่นอีกครั้ง" : "กลับหน้าแรก"}</button><button id="stay">ดูกระดาน</button></div></div>`;
   m.querySelector("#again").onclick = () => { if (role === "bot") { m.remove(); $("title").style.display = ""; } else location.href = location.pathname; };
   m.querySelector("#stay").onclick = () => m.remove();
   document.body.appendChild(m);
+}
+function gameOverOnline() {
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="box panel" style="text-align:center"><h2 class="px-text" style="font-size:30px">${V.winner === "me" ? "🏆 คุณชนะ!" : "💀 คุณแพ้"}</h2><p>จบที่เทิร์น ${V.turn}</p>
+    <label style="display:flex;gap:8px;align-items:center;justify-content:center">เดคตาต่อไป <select id="rmdeck">${deckOptions(false)}</select></label>
+    <div class="muted" id="rmstatus"></div>
+    <div class="btns"><button class="main" id="rmgo">พร้อมเล่นอีกตา</button><button id="stay">ดูกระดาน</button><button id="leave">ออกจากห้อง</button></div></div>`;
+  m.querySelector("#rmdeck").value = $("mydeck").value;
+  m.querySelector("#rmgo").onclick = () => {
+    const spec = deckSpec(m.querySelector("#rmdeck").value);
+    if (typeof spec === "string") return (m.querySelector("#rmstatus").textContent = spec);
+    rematch.me = spec; m.querySelector("#rmgo").disabled = true;
+    if (role === "guest") conn.send({ type: "rematch", deck: spec }); else conn.send({ type: "rematch" });
+    rematchStatus(); tryRematch();
+  };
+  m.querySelector("#stay").onclick = () => { m.style.display = "none"; setTimeout(() => (m.style.display = ""), 8000); };
+  m.querySelector("#leave").onclick = () => (location.href = location.pathname);
+  document.body.appendChild(m); rematchStatus();
 }
 function notice(title, body) {
   const m = document.createElement("div"); m.className = "modal";
@@ -546,16 +633,34 @@ const myName = () => $("myname").value.trim() || (role === "guest" ? "ผู้�
 const ARCHS = Engine.archetypes(ALL);
 const RACEORDER = ["มนุษย์", "นรก", "สวรรค์", "ภูต", "สัตว์", "ไดโนเสาร์", "เครื่องจักร", "มังกร", "ปลา"];
 ARCHS.sort((a, b) => RACEORDER.indexOf(a[1]) - RACEORDER.indexOf(b[1]));
-for (const s of ["mydeck", "botdeck"])
-  $(s).innerHTML = (s === "botdeck" ? `<option value="">สุ่ม</option>` : "") + ARCHS.map(([a, r]) => `<option value="${esc(a)}">${esc(r)} · ${esc(a)}</option>`).join("");
+// เดคที่จัดเอง เก็บในเครื่อง: [{ name, ids }]  · ค่าในช่องเลือกเดค: "a:<สาย>" หรือ "d:<ลำดับเดคที่บันทึก>"
+const loadDecks = () => { try { const d = JSON.parse(store.get("decks") || "[]"); return Array.isArray(d) ? d.filter((x) => x && Array.isArray(x.ids)) : []; } catch { return []; } };
+const saveDecks = (d) => store.set("decks", JSON.stringify(d));
+function deckOptions(random) {
+  const mine = loadDecks().map((d, i) => `<option value="d:${i}">${esc(d.name)}${Engine.validateDeck(ALL, d.ids) ? " (ยังไม่ครบ)" : ""}</option>`).join("");
+  return (random ? `<option value="">สุ่มสาย</option>` : "") + (mine ? `<optgroup label="เดคที่จัดเอง">${mine}</optgroup>` : "") +
+    `<optgroup label="จัดอัตโนมัติตามสาย">${ARCHS.map(([a, r]) => `<option value="a:${esc(a)}">${esc(r)} · ${esc(a)}</option>`).join("")}</optgroup>`;
+}
+function refreshDeckSelects() {
+  for (const id of ["mydeck", "botdeck"]) { const el = $(id), v = el.value; el.innerHTML = deckOptions(id === "botdeck"); if ([...el.options].some((o) => o.value === v)) el.value = v; }
+}
+// ค่าในช่องเลือก → สเปกเดคที่ Session รับ ({ arch } | { name, ids }) หรือข้อความ error
+function deckSpec(v) {
+  if (!v) return { arch: ARCHS[Math.floor(Math.random() * ARCHS.length)][0] };
+  if (v.startsWith("a:")) return { arch: v.slice(2) };
+  const d = loadDecks()[+v.slice(2)]; if (!d) return "ไม่พบเดคนี้";
+  const err = Engine.validateDeck(ALL, d.ids); return err ? `เดค "${d.name}" ยังใช้ไม่ได้: ${err}` : { name: d.name, ids: d.ids };
+}
+refreshDeckSelects();
 $("mascots").innerHTML = MASCOTS.map((m, i) => `<img src="img/${m}.png" alt="" style="animation-delay:${-i * 0.25}s">`).join("");
 $("myname").value = store.get("name") || "";
-if (store.get("deck")) $("mydeck").value = store.get("deck");
+if (store.get("deck") && [...$("mydeck").options].some((o) => o.value === store.get("deck"))) $("mydeck").value = store.get("deck");
 const remember = () => { store.set("name", $("myname").value.trim()); store.set("deck", $("mydeck").value); };
 $("go").onclick = () => {
+  const mine = deckSpec($("mydeck").value), bot = deckSpec($("botdeck").value);
+  if (typeof mine === "string" || typeof bot === "string") return netmsg(esc(typeof mine === "string" ? mine : bot));
   role = "bot"; remember();
-  const botArch = $("botdeck").value || ARCHS[Math.floor(Math.random() * ARCHS.length)][0];
-  newSession(["local", "bot"], [myName(), "บอท"], [$("mydeck").value, botArch]);
+  newSession(["local", "bot"], [myName(), "บอท"], [mine, bot]);
 };
 
 // ---------------------------------------------------------------- ออนไลน์ (PeerJS: เชื่อมเครื่องตรงหากัน ไม่ต้องมีเซิร์ฟเวอร์ของเราเอง)
@@ -566,8 +671,33 @@ function loadPeer() {
 }
 const newCode = () => Array.from({ length: 5 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join("");
 const ARCHSET = new Set(ARCHS.map((a) => a[0]));
+let guestName = "ผู้เล่น 2";
+// เจ้าของห้องตรวจเดคที่เพื่อนส่งมา (กันเดคผิดกติกา)
+function checkRemoteDeck(d) {
+  if (!d || typeof d !== "object") return "ไม่ได้ส่งเดคมา";
+  if (d.ids) { const err = Engine.validateDeck(ALL, d.ids); return err || { name: String(d.name || "เดคจัดเอง").slice(0, 24), ids: d.ids.map(String) }; }
+  return ARCHSET.has(d.arch) ? { arch: d.arch } : "ไม่รู้จักสายนี้";
+}
+// เล่นอีกตาในห้องเดิม: ทั้งสองฝ่ายกด "พร้อม" แล้วเจ้าของห้องเริ่มเกมใหม่
+const rematch = { me: null, guest: null };
+function resetForNewGame() {
+  overShown = false; V = null; queue.length = 0; mode = "idle"; sel = null; fodder = new Set(); $("log").innerHTML = "";
+  for (const m of document.querySelectorAll(".modal")) m.remove();
+  rematch.me = rematch.guest = null;
+}
+function rematchStatus() {
+  const el = document.querySelector("#rmstatus"); if (!el) return;
+  el.textContent = rematch.me && rematch.guest ? "กำลังเริ่ม…" : rematch.me ? "รออีกฝ่ายกดพร้อม…" : rematch.guest ? "อีกฝ่ายพร้อมแล้ว!" : "";
+}
+function tryRematch() {
+  if (role !== "host" || !rematch.me || !rematch.guest) return;
+  const decks = [rematch.me, rematch.guest];
+  conn.send({ type: "newgame" }); resetForNewGame();
+  newSession(["local", "remote"], [myName(), guestName], decks);
+}
 
 async function hostRoom() {
+  if (typeof deckSpec($("mydeck").value) === "string") { peer = null; return netmsg(esc(deckSpec($("mydeck").value))); }
   role = "host"; remember();
   try { await loadPeer(); } catch (e) { peer = null; return netmsg(esc(e.message)); }
   const code = newCode();
@@ -585,15 +715,22 @@ async function hostRoom() {
     c.on("data", (d) => {
       if (!d || typeof d !== "object") return;
       if (d.type === "hello" && !S) {
-        const arch = ARCHSET.has(d.arch) ? d.arch : ARCHS[0][0], name = String(d.name || "ผู้เล่น 2").slice(0, 16);
-        newSession(["local", "remote"], [myName(), name === myName() ? name + " (2)" : name], [$("mydeck").value, arch]);
+        const deck = checkRemoteDeck(d.deck);
+        if (typeof deck === "string") { c.send({ type: "reject", s: deck }); setTimeout(() => c.close(), 500); conn = null; return; }
+        guestName = String(d.name || "ผู้เล่น 2").slice(0, 16); if (guestName === myName()) guestName += " (2)";
+        newSession(["local", "remote"], [myName(), guestName], [deckSpec($("mydeck").value), deck]);
+      } else if (d.type === "rematch" && S && S.phase === "over") {
+        const deck = checkRemoteDeck(d.deck);
+        if (typeof deck === "string") return c.send({ type: "err", s: deck });
+        rematch.guest = deck; rematchStatus(); tryRematch();
       } else if (d.type === "act" && S) S.act(1, d.a).then((err) => err && c.send({ type: "err", s: err }));
       else if (d.type === "answer" && pendingAsk) { const r = pendingAsk; pendingAsk = null; r(d.k); }
     });
-    c.on("close", () => { if (!S || S.phase !== "over") notice("เพื่อนออกจากห้อง", "การเชื่อมต่อหลุด เกมนี้จบแล้ว"); });
+    c.on("close", () => notice("เพื่อนออกจากห้อง", S && S.phase === "over" ? "เพื่อนออกจากห้องแล้ว" : "การเชื่อมต่อหลุด เกมนี้จบแล้ว"));
   });
 }
 async function joinRoom(code) {
+  if (typeof deckSpec($("mydeck").value) === "string") { peer = null; return netmsg(esc(deckSpec($("mydeck").value))); }
   role = "guest"; remember();
   code = code.trim().toUpperCase();
   if (!/^[A-Z0-9]{5}$/.test(code)) { peer = null; return netmsg("รหัสห้องต้องมี 5 ตัว"); }
@@ -603,16 +740,19 @@ async function joinRoom(code) {
   peer.on("error", (e) => netmsg(e.type === "peer-unavailable" ? "ไม่พบห้องนี้ (รหัสผิด หรือเจ้าของห้องปิดไปแล้ว)" : `เชื่อมต่อไม่ได้: ${esc(e.type)}`));
   peer.on("open", () => {
     conn = peer.connect(PREFIX + code, { reliable: true });
-    conn.on("open", () => { conn.send({ type: "hello", name: myName(), arch: $("mydeck").value }); netmsg("เข้าห้องแล้ว รอเจ้าของห้องเริ่ม…"); });
+    conn.on("open", () => { conn.send({ type: "hello", name: myName(), deck: deckSpec($("mydeck").value) }); netmsg("เข้าห้องแล้ว รอเจ้าของห้องเริ่ม…"); });
     conn.on("data", async (d) => {
       if (!d || typeof d !== "object") return;
       if (d.type === "view") { $("title").style.display = "none"; setView(d.v); }
       else if (d.type === "log") log(String(d.s));
       else if (d.type === "err") toast(String(d.s));
       else if (d.type === "full") netmsg("ห้องนี้เต็มแล้ว");
+      else if (d.type === "reject") netmsg("เจ้าของห้องไม่รับเดคนี้: " + esc(String(d.s)));
+      else if (d.type === "newgame") resetForNewGame();
+      else if (d.type === "rematch") { rematch.guest = true; rematchStatus(); }
       else if (d.type === "ask") { const k = await askModal(d.p); conn.send({ type: "answer", k }); }
     });
-    conn.on("close", () => { if (!V || V.phase !== "over") notice("เจ้าของห้องออกจากห้อง", "การเชื่อมต่อหลุด เกมนี้จบแล้ว"); });
+    conn.on("close", () => notice("เจ้าของห้องออกจากห้อง", V && V.phase === "over" ? "เจ้าของห้องออกจากห้องแล้ว" : "การเชื่อมต่อหลุด เกมนี้จบแล้ว"));
   });
 }
 $("host").onclick = () => { if (!peer) { peer = "starting"; hostRoom(); } };
@@ -620,7 +760,150 @@ $("join").onclick = () => { if (!peer) { peer = "starting"; joinRoom($("joincode
 const roomParam = new URLSearchParams(location.search).get("room");
 if (roomParam) { $("joincode").value = roomParam.toUpperCase(); netmsg("ใส่ชื่อ เลือกเดค แล้วกด <b>เข้าห้อง</b>"); }
 
+// ---------------------------------------------------------------- หน้าจัดเดค
+const CARD = Object.fromEntries(ALL.map((c) => [c.id, c]));
+const B = { name: "", ids: [], idx: null, page: 1 };          // idx = ลำดับในเดคที่บันทึก (null = เดคใหม่ยังไม่บันทึก)
+const PAGE = 48, TYPEORDER = { "มอน": 0, "เวทปกติ": 1, "เวทสวน": 2 };
+const raceRank = (r) => { const i = RACEORDER.indexOf(r.raceTh.split("+")[0]); return i < 0 ? 99 : i; };
+const SORTED = [...CARDS].sort((a, b) => raceRank(a) - raceRank(b) || TYPEORDER[a.type] - TYPEORDER[b.type] || (+a.cost || 0) - (+b.cost || 0) || a.id.localeCompare(b.id));
+const bmsg = (t, err = false) => { $("bmsg").textContent = t; $("bmsg").className = err ? "err" : ""; };
+const inDeck = (id) => B.ids.filter((x) => x === id).length;
+const limitOf = (id) => (CARD[id].onlyone ? 1 : 4);
+function fillFilters() {
+  const races = [...new Set(CARDS.flatMap((r) => r.raceTh.split("+")))].sort((a, b) => (RACEORDER.indexOf(a) + 1 || 99) - (RACEORDER.indexOf(b) + 1 || 99));
+  $("frace").innerHTML = `<option value="">ทุกเผ่า</option>` + races.map((r) => `<option>${esc(r)}</option>`).join("");
+  $("ftype").innerHTML = `<option value="">ทุกชนิด</option><option value="มอน">มอนสเตอร์</option><option>เวทปกติ</option><option>เวทสวน</option>`;
+  $("fcost").innerHTML = `<option value="">ทุก cost</option>` + Array.from({ length: 11 }, (_, i) => `<option value="${i}">cost ${i}${i === 10 ? "+" : ""}</option>`).join("");
+  fillArch();
+}
+function fillArch() {
+  const race = $("frace").value, v = $("farch").value;
+  const archs = [...new Set(CARDS.filter((r) => !race || r.raceTh.split("+").includes(race)).flatMap((r) => r.arch.split(" · ")))];
+  $("farch").innerHTML = `<option value="">ทุกสาย</option>` + archs.map((a) => `<option>${esc(a)}</option>`).join("");
+  if (archs.includes(v)) $("farch").value = v;
+}
+function filtered() {
+  const q = $("fq").value.trim(), race = $("frace").value, arch = $("farch").value, type = $("ftype").value, cost = $("fcost").value;
+  return SORTED.filter((r) => (!q || r.name.includes(q) || r.ability.includes(q)) && (!race || r.raceTh.split("+").includes(race)) &&
+    (!arch || r.arch.split(" · ").includes(arch)) && (!type || r.type === type) &&
+    (cost === "" || (r.cost !== "" && (+cost === 10 ? +r.cost >= 10 : +r.cost === +cost))));
+}
+function markCount(el, id) {
+  let b = el.querySelector(".incount"); const n = inDeck(id);
+  if (!n) { if (b) b.remove(); } else { if (!b) { b = document.createElement("div"); b.className = "incount"; el.appendChild(b); } b.textContent = `×${n}`; }
+  el.classList.toggle("maxed", n >= limitOf(id));
+}
+function renderGrid(reset) {
+  if (reset) { B.page = 1; $("bgrid").scrollTop = 0; }
+  const list = filtered(), grid = $("bgrid"); grid.innerHTML = "";
+  for (const r of list.slice(0, B.page * PAGE)) {
+    const el = cardEl(r, { cls: "click" }); el.dataset.id = r.id;
+    el.onclick = () => addCard(r.id); markCount(el, r.id); grid.appendChild(el);
+  }
+  if (!list.length) grid.innerHTML = `<p class="muted">ไม่พบการ์ดที่ตรงกับตัวกรอง</p>`;
+  for (const el of grid.querySelectorAll(".card")) fitCard(el);
+  $("bmore").style.display = list.length > B.page * PAGE ? "" : "none";
+  $("bmore").textContent = `แสดงเพิ่ม (เหลืออีก ${list.length - B.page * PAGE} ใบ)`;
+}
+function refreshCounts(id) { for (const el of $("bgrid").querySelectorAll(`.card[data-id="${id}"]`)) markCount(el, id); }
+function addCard(id) {
+  if (B.ids.length >= Engine.DECK) return bmsg(`เดคเต็ม ${Engine.DECK} ใบแล้ว`, true);
+  if (inDeck(id) >= limitOf(id)) return bmsg(`${CARD[id].name} ใส่ได้ไม่เกิน ${limitOf(id)} ใบ`, true);
+  B.ids.push(id); bmsg(`+ ${CARD[id].name}`); refreshCounts(id); renderDeck();
+}
+function removeCard(id) { const i = B.ids.lastIndexOf(id); if (i >= 0) B.ids.splice(i, 1); bmsg(`− ${CARD[id].name}`); refreshCounts(id); renderDeck(); }
+function zoomCard(r) { const z = document.createElement("div"); z.className = "zoom"; z.appendChild(cardEl(r)); z.onclick = () => z.remove(); document.body.appendChild(z); }
+function renderDeck() {
+  const n = B.ids.length, cs = B.ids.map((id) => CARD[id]);
+  $("dcount").textContent = `${n}/${Engine.DECK}`; $("dcount").className = n === Engine.DECK ? "ok" : "";
+  $("bdecktoggle").textContent = `${n}/${Engine.DECK}`;
+  const mons = cs.filter((c) => c.type === "มอน");
+  $("dstats").textContent = n ? `มอน ${mons.length} · เวทปกติ ${cs.filter((c) => c.type === "เวทปกติ").length} · เวทสวน ${cs.filter((c) => c.type === "เวทสวน").length}` +
+    ` · cost มอนเฉลี่ย ${(mons.reduce((a, c) => a + c.cost, 0) / (mons.length || 1)).toFixed(1)} · gem รวม ${cs.reduce((a, c) => a + c.gem, 0)}` : "แตะการ์ดทางซ้ายเพื่อใส่เดค";
+  const uniq = [...new Set(B.ids)].map((id) => ROW[id]).sort((a, b) => TYPEORDER[a.type] - TYPEORDER[b.type] || (+a.cost || 0) - (+b.cost || 0) || a.name.localeCompare(b.name));
+  $("dlist").innerHTML = "";
+  for (const r of uniq) {
+    const row = document.createElement("div"); row.className = "drow";
+    row.innerHTML = `<span class="dc${r.type === "มอน" ? "" : " spell"}">${r.type === "มอน" ? r.cost : r.type === "เวทสวน" ? "สวน" : "เวท"}</span>
+      <span class="dn">${esc(r.name)}</span><span class="dk">×${inDeck(r.id)}</span><button title="เอาออก">−</button><button title="เพิ่ม">+</button>`;
+    const [minus, plus] = row.querySelectorAll("button");
+    minus.onclick = (e) => { e.stopPropagation(); removeCard(r.id); };
+    plus.onclick = (e) => { e.stopPropagation(); addCard(r.id); };
+    row.onclick = () => zoomCard(r);
+    $("dlist").appendChild(row);
+  }
+  $("ddelete").disabled = B.idx == null;
+}
+function fillSaved() {
+  $("dsaved").innerHTML = `<option value="">— เดคใหม่ —</option>` + loadDecks().map((d, i) => `<option value="${i}">${esc(d.name)} (${d.ids.length})</option>`).join("");
+  $("dsaved").value = B.idx == null ? "" : String(B.idx);
+}
+function loadInto(idx) {
+  const d = idx == null ? null : loadDecks()[idx];
+  Object.assign(B, d ? { name: d.name, ids: [...d.ids].filter((id) => CARD[id]), idx } : { name: "", ids: [], idx: null });
+  $("dname").value = B.name; fillSaved(); renderDeck(); renderGrid(false); bmsg(d ? `เปิดเดค "${d.name}"` : "เดคใหม่");
+}
+function openBuilder() {
+  $("title").style.display = "none"; $("builder").hidden = false;
+  if (!$("frace").options.length) fillFilters();
+  const v = $("mydeck").value; loadInto(v.startsWith("d:") ? +v.slice(2) : null); renderGrid(true);
+}
+function closeBuilder() { $("builder").hidden = true; $("title").style.display = ""; refreshDeckSelects(); }
+$("openbuilder").onclick = openBuilder;
+$("bclose").onclick = closeBuilder;
+$("bmore").onclick = () => { B.page++; renderGrid(false); };
+let fqTimer = 0;
+$("fq").oninput = () => { clearTimeout(fqTimer); fqTimer = setTimeout(() => renderGrid(true), 250); };
+$("frace").onchange = () => { fillArch(); renderGrid(true); };
+for (const id of ["farch", "ftype", "fcost"]) $(id).onchange = () => renderGrid(true);
+$("dsaved").onchange = () => loadInto($("dsaved").value === "" ? null : +$("dsaved").value);
+$("dname").oninput = () => (B.name = $("dname").value);
+$("bdecktoggle").onclick = () => $("bdeck").classList.toggle("open");
+$("dsave").onclick = () => {
+  const decks = loadDecks(), name = $("dname").value.trim() || `เดคของฉัน ${decks.length + 1}`;
+  const d = { name, ids: [...B.ids] };
+  if (B.idx == null) { decks.push(d); B.idx = decks.length - 1; } else decks[B.idx] = d;
+  saveDecks(decks); B.name = name; $("dname").value = name; fillSaved(); refreshDeckSelects(); renderDeck();
+  $("mydeck").value = `d:${B.idx}`; remember();
+  const err = Engine.validateDeck(ALL, B.ids);
+  bmsg(err ? `บันทึกแล้ว แต่ยังเล่นไม่ได้: ${err}` : `บันทึก "${name}" แล้ว · เลือกใช้ได้ที่หน้าแรก`, !!err);
+};
+$("dnew").onclick = () => loadInto(null);
+$("dfill").onclick = () => {
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="box panel"><h2 class="px-text">เริ่มจากสาย</h2><p class="muted">แทนที่เดคตอนนี้ด้วยเดค 50 ใบที่จัดอัตโนมัติจากสายนี้ แล้วค่อยแก้ต่อ</p>
+    <select id="fillarch">${ARCHS.map(([a, r]) => `<option value="${esc(a)}">${esc(r)} · ${esc(a)}</option>`).join("")}</select>
+    <div class="btns"><button class="main" id="fillok">ใช้สายนี้</button><button id="fillno">ยกเลิก</button></div></div>`;
+  m.querySelector("#fillok").onclick = () => {
+    const a = m.querySelector("#fillarch").value; B.ids = Engine.buildDeck(ALL, a).map((c) => c.id);
+    if (!$("dname").value.trim()) { $("dname").value = B.name = a; }
+    m.remove(); renderDeck(); renderGrid(false); bmsg(`ใส่เดคสาย ${a} แล้ว (ยังไม่ได้บันทึก)`);
+  };
+  m.querySelector("#fillno").onclick = () => m.remove();
+  document.body.appendChild(m);
+};
+$("dcode").onclick = async () => {
+  if (!B.ids.length) return bmsg("เดคยังว่าง", true);
+  const code = Engine.deckCode(B.ids);
+  try { await navigator.clipboard.writeText(code); bmsg("คัดลอกรหัสเดคแล้ว ส่งให้เพื่อนกด \"นำเข้ารหัส\""); }
+  catch { prompt("คัดลอกรหัสเดคนี้", code); }
+};
+$("dimport").onclick = () => {
+  const code = prompt("วางรหัสเดค"); if (!code) return;
+  const ids = Engine.parseDeckCode(code);
+  if (!ids || ids.some((id) => !CARD[id])) return bmsg("รหัสเดคไม่ถูกต้อง", true);
+  Object.assign(B, { ids, idx: null, name: "เดคนำเข้า" }); $("dname").value = B.name; fillSaved(); renderDeck(); renderGrid(false);
+  const err = Engine.validateDeck(ALL, ids); bmsg(err ? `นำเข้าแล้ว แต่: ${err}` : "นำเข้าแล้ว กดบันทึกเพื่อเก็บไว้", !!err);
+};
+$("ddelete").onclick = () => {
+  if (B.idx == null || !confirm(`ลบเดค "${B.name}"?`)) return;
+  const decks = loadDecks(); decks.splice(B.idx, 1); saveDecks(decks);
+  if ($("mydeck").value.startsWith("d:")) $("mydeck").value = `a:${ARCHS[0][0]}`;
+  refreshDeckSelects(); loadInto(null); bmsg("ลบแล้ว");
+};
+
 // ---------------------------------------------------------------- ทดสอบ
+if (location.hash === "#builder") { openBuilder(); $("dfill").click(); document.querySelector("#fillok").click(); }   // ทดสอบหน้าจัดเดค
 if (location.hash === "#demo") { $("go").click(); S.act(0, { t: "mull", idx: [] }); }   // เริ่มเกมกับบอททันที
 if (location.hash === "#auto") {                                                      // บอทเล่นทั้งสองฝั่ง เพื่อดูว่าหน้าจอวาดทุกสถานะได้
   role = "bot"; newSession(["bot", "bot"], ["บอท A", "บอท B"], [ARCHS[0][0], ARCHS[20][0]], { watch: true, botDelay: 0 });
@@ -633,7 +916,13 @@ if (location.hash === "#watch") {                                               
 let autoBusy = false;
 function autoStep() {
   if (!V || autoBusy) return;
-  if (V.phase === "over") { parent.postMessage({ done: role, winner: V.winner, turn: V.turn, hp: [V.me.hp, V.opp.hp] }, "*"); return; }
+  if (V.phase === "over") {                                   // เกมแรกจบ → กดเล่นอีกตา · เกมที่สองจบ → รายงานผล
+    if (window.GAMES_DONE === undefined) window.GAMES_DONE = 0;
+    if (window.LAST_OVER === V) return; window.LAST_OVER = V; window.GAMES_DONE++;
+    parent.postMessage({ done: role + window.GAMES_DONE, winner: V.winner, turn: V.turn, hp: [V.me.hp, V.opp.hp], deck: V.me.arch }, "*");
+    if (window.GAMES_DONE === 1) setTimeout(() => { const b = document.querySelector("#rmgo"); if (b) b.click(); }, 300);
+    return;
+  }
   if (V.phase === "mull" && !V.mullDone) return act({ t: "mull", idx: [0] });
   if (!V.myTurn) return;
   const r = Math.random(), hand = V.me.hand.map((h, k) => [h, k]);
@@ -647,6 +936,7 @@ function autoStep() {
 }
 if (location.hash === "#nethost" || location.hash === "#netguest") {
   window.AUTOPLAY = true; $("myname").value = location.hash === "#nethost" ? "เจ้าของห้อง" : "เพื่อน";
+  if (location.hash === "#netguest") { saveDecks([{ name: "เดคทดสอบ", ids: Engine.buildDeck(ALL, ARCHS[5][0]).map((c) => c.id) }]); refreshDeckSelects(); $("mydeck").value = "d:0"; }
   if (location.hash === "#nethost") $("host").click(); else $("join").click();
 }
 </script>

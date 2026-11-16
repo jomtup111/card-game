@@ -815,6 +815,31 @@
     return [...s.entries()];
   }
 
-  const api = { Card, Unit, Game, buildDeck, archetypes, HP, FIELD };
+  // ตรวจเดคที่จัดเอง (รายการรหัสการ์ด) ตามกติกา → ข้อความ error หรือ null
+  const DECK = 50;
+  function validateDeck(cards, ids) {
+    if (!Array.isArray(ids)) return "เดคไม่ถูกต้อง";
+    if (ids.length !== DECK) return `เดคต้องมี ${DECK} ใบ (ตอนนี้ ${ids.length} ใบ)`;
+    const by = new Map(cards.map((c) => [c.id, c])), n = {};
+    for (const id of ids) {
+      const c = by.get(id); if (!c) return `ไม่รู้จักการ์ดรหัส ${String(id).slice(0, 20)}`;
+      n[id] = (n[id] || 0) + 1; const lim = c.onlyone ? 1 : 4;
+      if (n[id] > lim) return `${c.name} ใส่ได้ไม่เกิน ${lim} ใบ`;
+    }
+    return null;
+  }
+  // รหัสแชร์เดค: "ID*จำนวน" คั่นด้วย . แล้วเข้ารหัส base64url
+  const b64 = (s) => (typeof btoa !== "undefined" ? btoa(s) : Buffer.from(s, "binary").toString("base64")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const unb64 = (s) => { s = s.replace(/-/g, "+").replace(/_/g, "/"); return typeof atob !== "undefined" ? atob(s) : Buffer.from(s, "base64").toString("binary"); };
+  function deckCode(ids) { const n = {}; for (const id of ids) n[id] = (n[id] || 0) + 1; return b64(Object.entries(n).map(([id, k]) => `${id}*${k}`).join(".")); }
+  function parseDeckCode(code) {
+    try {
+      const ids = [];
+      for (const part of unb64(String(code).trim()).split(".")) { const m = part.match(/^([A-Z]{3}-[A-Z0-9]+-\d+)\*(\d{1,2})$/); if (!m) return null; for (let i = 0; i < +m[2]; i++) ids.push(m[1]); }
+      return ids;
+    } catch { return null; }
+  }
+
+  const api = { Card, Unit, Game, buildDeck, archetypes, validateDeck, deckCode, parseDeckCode, DECK, HP, FIELD };
   if (typeof module !== "undefined") module.exports = api; else root.Engine = api;
 })(typeof window !== "undefined" ? window : globalThis);
