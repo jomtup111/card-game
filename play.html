@@ -262,6 +262,7 @@
       <span id="paybox"></span>
       <button id="cancel" style="display:none">ยกเลิก</button>
       <button id="logbtn">บันทึก</button>
+      <button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button>
       <button class="main" id="endturn">จบเทิร์น</button>
     </div>
     <div class="row hand" id="mhand"></div>
@@ -290,6 +291,7 @@
     </div>
     <div class="panel wide" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <span style="flex:1;min-width:200px">เพิ่งเคยเล่น? เรียนกติกา 8 ขั้นสั้น ๆ แล้วลองเล่นกับบอทพร้อมคำแนะนำ</span>
+      <button id="soundtitle" title="เปิด/ปิดเสียง">🔊 เสียง</button>
       <button class="main" id="opentutor">สอนเล่น</button><button id="practice">ฝึกเล่น (มีคำแนะนำ)</button>
     </div>
     <div class="panel wide help">
@@ -345,6 +347,9 @@ const KW = ["พรีกาย","ซ่อนตัว","บิน","บดข�
   "สังเวย","ฟื้นคืน","ล่อลวง","เนรเทศ","ขบวน","คอมโบ","ร่ายเวท","คู่หู","มือเต็ม","เครื่องเซ่น","ล่ารุม","กินเหยื่อ","คลั่งเลือด",
   "ฟอสซิลมีชีวิต","หลับใหล","ปลุก:","อัปเกรด","ชิ้นส่วนไททัน","ฟัก"];
 const TOKRACE = { "นรก": "hell", "มนุษย์": "human", "เครื่องจักร": "machine", "ภูต": "spirit", "สัตว์": "beast", "ปลา": "fish", "มังกร": "dragon", "ไดโนเสาร์": "dino" };
+const TOKART = { "ลูกหมานรก": "tok_hellpup", "ร่างแยก": "tok_clone", "เฟือง": "tok_gear", "โดรน": "tok_drone", "ต้นกล้า": "tok_sapling",
+  "ลูกหมาป่า": "tok_wolfpup", "ตัวอ่อน": "tok_larva", "ปลาเล็ก": "tok_fish", "ลูกมังกร": "tok_whelp", "ไข่": "tok_egg",
+  "โอเมก้าบอท": "tok_omega", "ไททันเกียร์": "tok_titan", "หุ่นเฟือง": "tok_gearbot" };
 const MASCOTS = ["hum_hans", "hel_grib", "hea_luz", "spi_mushy", "bea_nutty", "din_tricky", "mac_box", "dra_gildy", "fis_hermit"];
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -426,7 +431,7 @@ function fitCard(el) {
 function unitCard(x) {
   if (x.id) return ROW[x.id];
   const k = x.tok.kinds[0];
-  return { name: x.tok.name, race: TOKRACE[k] || "neutral", raceTh: k, arch: "", type: "โทเคน", cost: "", gem: "", power: String(x.tok.power), ability: "", art: null };
+  return { name: x.tok.name, race: TOKRACE[k] || "neutral", raceTh: k, arch: "", type: "โทเคน", cost: "", gem: "", power: String(x.tok.power), ability: "", art: TOKART[x.tok.name] || null };
 }
 
 // ---------------------------------------------------------------- สถานะฝั่งหน้าจอ
@@ -465,17 +470,59 @@ function applyView(v) {
   render();
   if (!FAST && prev) {
     const now = new Set([...V.me.field, ...V.opp.field].map((x) => String(x.uid)));
-    for (const [uid, [r, el]] of Object.entries(rects)) if (!now.has(uid)) dieFx(r, el);      // ตาย / ออกจากสนาม
-    for (const el of document.querySelectorAll(".field .card[data-uid]")) if (!rects[el.dataset.uid]) el.classList.add("enter");   // ลงสนาม
+    let died = 0, entered = 0;
+    for (const [uid, [r, el]] of Object.entries(rects)) if (!now.has(uid)) { dieFx(r, el); died++; }     // ตาย / ออกจากสนาม
+    for (const el of document.querySelectorAll(".field .card[data-uid]")) if (!rects[el.dataset.uid]) { el.classList.add("enter"); entered++; }   // ลงสนาม
+    if (died) SFX.play("die"); else if (entered) SFX.play("summon");
     for (const [side, id] of [["me", "mhp"], ["opp", "ehp"]]) {
       const lost = prev[side].hp - V[side].hp;
-      if (lost > 0) { const h = $(id); h.classList.remove("shake"); void h.offsetWidth; h.classList.add("shake"); floatText(h.getBoundingClientRect(), `-${lost}`); }
+      if (lost > 0) { SFX.play("hurt"); const h = $(id); h.classList.remove("shake"); void h.offsetWidth; h.classList.add("shake"); floatText(h.getBoundingClientRect(), `-${lost}`); }
     }
-    if (V.phase === "play" && (prev.phase !== "play" || prev.turn !== V.turn)) banner(V.myTurn ? "ตาคุณ!" : `ตาของ ${V.whoseTurn}`);
+    if (V.phase === "play" && (prev.phase !== "play" || prev.turn !== V.turn)) { banner(V.myTurn ? "ตาคุณ!" : `ตาของ ${V.whoseTurn}`); if (V.myTurn) SFX.play("turn"); }
   }
   if (V.phase === "over" && !overShown) { overShown = true; setTimeout(gameOver, FAST ? 0 : 700); }
   if (window.AUTOPLAY) setTimeout(autoStep, 30);
 }
+
+// ---------------------------------------------------------------- เสียง (สังเคราะห์แบบชิปทูนด้วย Web Audio — ไม่ใช้ไฟล์)
+const SFX = (() => {
+  let ctx = null, on = store.get("sound") !== "off";
+  const ac = () => (ctx ||= new (window.AudioContext || window.webkitAudioContext)());
+  function tone(f, dur, { type = "square", vol = 0.07, slide = 0, delay = 0 } = {}) {
+    const c = ac(), t = c.currentTime + delay, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f * slide), t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function noise(dur, { vol = 0.1, delay = 0, hp = 900 } = {}) {
+    const c = ac(), t = c.currentTime + delay, b = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    src.buffer = b; f.type = "highpass"; f.frequency.value = hp; g.gain.value = vol; src.connect(f).connect(g).connect(c.destination); src.start(t);
+  }
+  const S = {
+    summon: () => [523, 659, 784].forEach((f, i) => tone(f, 0.09, { delay: i * 0.06 })),
+    attack: () => { noise(0.14, { vol: 0.08, hp: 400 }); tone(260, 0.16, { type: "sawtooth", slide: 0.4, vol: 0.05 }); },
+    hit: () => { noise(0.09, { vol: 0.14, hp: 1800 }); tone(110, 0.1, { vol: 0.08 }); },
+    die: () => { tone(330, 0.38, { type: "triangle", slide: 0.22, vol: 0.1 }); noise(0.25, { vol: 0.05, hp: 3000, delay: 0.05 }); },
+    cast: () => [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.13, { type: "triangle", delay: i * 0.05, vol: 0.07 })),
+    react: () => { tone(1047, 0.07); tone(784, 0.07, { delay: 0.07 }); tone(1319, 0.14, { delay: 0.14 }); },
+    hurt: () => { tone(160, 0.28, { slide: 0.45, vol: 0.1 }); noise(0.12, { vol: 0.1, hp: 600 }); },
+    turn: () => { tone(659, 0.08, { type: "triangle" }); tone(988, 0.15, { type: "triangle", delay: 0.08 }); },
+    click: () => tone(1400, 0.025, { vol: 0.03 }),
+    win: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i === 4 ? 0.5 : 0.18, { delay: i * 0.12, vol: 0.08 })),
+    lose: () => [392, 330, 262, 196].forEach((f, i) => tone(f, 0.3, { delay: i * 0.18, type: "triangle", vol: 0.09 })),
+  };
+  addEventListener("pointerdown", () => { try { if (on && ac().state === "suspended") ctx.resume(); } catch {} }, true);   // เบราว์เซอร์อนุญาตเสียงหลังผู้ใช้แตะจอ
+  return {
+    play(k) { if (!on || FAST) return; try { if (ac().state === "suspended") ctx.resume(); S[k] && S[k](); } catch {} },
+    get on() { return on; },
+    toggle() { on = !on; store.set("sound", on ? "on" : "off"); return on; },
+  };
+})();
+function soundIcons() { $("soundbtn").textContent = SFX.on ? "🔊" : "🔇"; $("soundtitle").textContent = (SFX.on ? "🔊" : "🔇") + " เสียง"; }
+$("soundbtn").onclick = $("soundtitle").onclick = (e) => { e.stopPropagation(); SFX.toggle(); soundIcons(); SFX.play("click"); };
+soundIcons();
 
 // ---------------------------------------------------------------- อนิเมชัน
 const fxLayer = (() => { const d = document.createElement("div"); d.className = "fxlayer"; document.body.appendChild(d); return d; })();
@@ -493,14 +540,15 @@ async function playFx(e, v) {
     const mine = a.parentElement.id === "mfield";
     const t = e.b === "face" ? $(mine ? "ehp" : "mhp") : document.querySelector(`.field .card[data-uid="${e.b}"]`); if (!t) return;
     const [ax, ay] = center(a.getBoundingClientRect()), [tx, ty] = center(t.getBoundingClientRect());
-    a.style.zIndex = 5;
+    a.style.zIndex = 5; SFX.play("attack");
     a.animate([{ transform: "none" }, { transform: `translate(${(ax - tx) * 0.12}px, ${(ay - ty) * 0.12}px)`, offset: 0.25 },
                { transform: `translate(${(tx - ax) * 0.75}px, ${(ty - ay) * 0.75}px) scale(1.08)`, offset: 0.55 }, { transform: "none" }], { duration: 520, easing: "ease-in-out" });
     await sleep(290);
-    sprite("img/ui_hit.png", "hit", [tx, ty], 420); t.classList.remove("shake"); void t.offsetWidth; t.classList.add("shake");
+    sprite("img/ui_hit.png", "hit", [tx, ty], 420); SFX.play("hit"); t.classList.remove("shake"); void t.offsetWidth; t.classList.add("shake");
     await sleep(300); a.style.zIndex = "";
   } else if (e.t === "cast" || e.t === "react") {
     const who = e.by === v.seat ? "คุณ" : v.opp.name;
+    SFX.play(e.t === "cast" ? "cast" : "react");
     const d = document.createElement("div"); d.className = "showcard";
     d.innerHTML = `<b class="px-text">${esc(who)} ${e.t === "cast" ? "ร่ายเวท" : "ใช้เวทสวน!"}</b>`;
     d.appendChild(cardEl(ROW[e.id])); document.body.appendChild(d);
@@ -585,6 +633,7 @@ function render() {
 }
 
 function clickHand(h, k) {
+  SFX.play("click");
   if (mode === "mull") { fodder.has(k) ? fodder.delete(k) : fodder.add(k); return render(); }
   if (mode === "pay") {
     if (k === sel) return;
@@ -629,6 +678,7 @@ function askModal(p) {
   });
 }
 function gameOver() {
+  SFX.play(V.winner === "me" ? "win" : "lose");
   if (role === "host" || role === "guest") return gameOverOnline();
   const m = document.createElement("div"); m.className = "modal";
   m.innerHTML = `<div class="box panel" style="text-align:center"><h2 class="px-text" style="font-size:30px">${V.winner === "me" ? "🏆 คุณชนะ!" : "💀 คุณแพ้"}</h2><p>จบที่เทิร์น ${V.turn}</p>
@@ -1027,6 +1077,12 @@ $("practice").onclick = () => {
 
 // ---------------------------------------------------------------- ทดสอบ
 if (location.hash === "#tutor") { $("opentutor").click(); showTut(+(new URLSearchParams(location.search).get("step") || 0)); }   // ทดสอบหน้าสอนเล่น
+if (location.hash === "#tokens") {                                                    // ทดสอบ: วางโทเคนทุกแบบบนกระดาน
+  role = "bot"; newSession(["bot", "bot"], ["บอท A", "บอท B"], [ARCHS[0][0], ARCHS[1][0]], { watch: true, botDelay: 1e9 });
+  setTimeout(() => { const [A, B] = S.G.P; A.field.length = B.field.length = 0;
+    ["ลูกหมานรก", "ร่างแยก", "เฟือง", "โดรน", "ต้นกล้า"].forEach((n) => B.field.push(new Engine.Unit(null, n)));
+    ["ลูกหมาป่า", "ตัวอ่อน", "ปลาเล็ก", "ลูกมังกร", "ไข่"].forEach((n) => A.field.push(new Engine.Unit(null, n))); S.push(); }, 300);
+}
 if (location.hash === "#practice") { $("practice").click(); }
 if (location.hash === "#builder") { openBuilder(); $("dfill").click(); document.querySelector("#fillok").click(); }   // ทดสอบหน้าจัดเดค
 if (location.hash === "#demo") { $("go").click(); S.act(0, { t: "mull", idx: [] }); }   // เริ่มเกมกับบอททันที
