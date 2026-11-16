@@ -14,6 +14,7 @@
       Object.assign(this, { botDelay: 600, watch: false }, o);
       this.G = new E.Game(E.buildDeck(o.cards, o.decks[0]), E.buildDeck(o.cards, o.decks[1]), o.seed, (s) => this.onLog(s));
       this.G.P.forEach((p, i) => (p.name = o.names[i]));
+      this.fxq = []; this.G.onFx = (e) => this.fxq.push(e);
       this.phase = "mull"; this.mullDone = [false, false]; this.busy = false;
       this.reactFn = (d, info) => this.react(d, info);
     }
@@ -26,7 +27,10 @@
       const G = this.G; this.phase = "play"; G.cur = G.rnd() < 0.5 ? 0 : 1; this.onLog(`${G.P[G.cur].name} เริ่มก่อน`);
       return this.nextTurn();
     }
-    push() { for (const i of [0, 1]) if (this.seats[i] !== "bot" || (this.watch && i === 0)) this.onView(i, this.view(i)); }
+    push() {                                                        // ส่ง view ล่าสุด + เหตุการณ์ที่เกิดตั้งแต่ครั้งก่อน (fx) ให้ทุกคน
+      const fx = this.fxq; this.fxq = [];
+      for (const i of [0, 1]) if (this.seats[i] !== "bot" || (this.watch && i === 0)) this.onView(i, { ...this.view(i), fx });
+    }
 
     // ---------- มุมมองของผู้เล่น i (ข้อมูลล้วน ส่งผ่านเน็ตได้)
     view(i) {
@@ -62,7 +66,7 @@
           auto: mon && my && !err ? (G.autoPay(p, G.cost(p, c), c) || []).map((x) => p.hand.indexOf(x)) : [] };
       });
       return {
-        phase: this.phase, mullDone: this.mullDone[i], turn: G.turn, myTurn: my, busy: this.busy,
+        seat: i, phase: this.phase, mullDone: this.mullDone[i], turn: G.turn, myTurn: my, busy: this.busy,
         whoseTurn: G.P[G.cur].name, winner: G.winner ? (G.winner === p ? "me" : "opp") : null,
         me: { name: p.name, arch: this.decks[i], hp: p.hp, deck: p.deck.length, grave: p.grave.map((c) => c.name), hand,
               field: p.field.map((x) => unit(p, x, true)), spellUsed: p.spellUsed, spellMax: p.spellMax },

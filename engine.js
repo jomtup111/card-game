@@ -258,9 +258,10 @@
     constructor(deckA, deckB, seed = Date.now(), log = () => {}) {
       this.rnd = rngOf(seed); this.log = log;
       this.P = [new Player("คุณ", deckA, this.rnd), new Player("บอท", deckB, this.rnd)];
-      this.turn = 0; this.deaths = 0; this.cur = 0; this.winner = null;
+      this.turn = 0; this.deaths = 0; this.cur = 0; this.winner = null; this.onFx = null;
       for (const p of this.P) p.draw(HAND0);
     }
+    emit(e) { if (this.onFx) this.onFx(e); }                      // เหตุการณ์ให้หน้าจอเล่นอนิเมชัน
     other(p) { return p === this.P[0] ? this.P[1] : this.P[0]; }
     mulligan(p, cards) { for (const c of cards) { const i = p.hand.indexOf(c); if (i >= 0) p.hand.splice(i, 1); } p.deck.push(...cards); shuffle(p.deck, this.rnd); p.draw(cards.length); }
     botMulligan(p) {
@@ -539,12 +540,12 @@
     async cast(p, c, react = null) {
       const err = this.spellUsable(p, c); if (err) return err;
       p.hand.splice(p.hand.indexOf(c), 1); p.grave.push(c); p.played++; p.spellUsed++;
-      this.log(`🔮 ${p.name} ใช้เวท ${c.name}`);
+      this.log(`🔮 ${p.name} ใช้เวท ${c.name}`); this.emit({ t: "cast", id: c.id, by: this.P.indexOf(p) });
       const e = this.other(p);
       if (react && !e.reacted) {
         const opts = e.hand.filter((x) => x.type === "เวทสวน" && x.counter && x.counter[0] === "spell").map((card) => ({ kind: "counter", card }));
         const ch = opts.length ? await react(e, { opts, spell: c }) : null;
-        if (ch) { e.hand.splice(e.hand.indexOf(ch.card), 1); e.grave.push(ch.card); e.reacted = true; this.log(`✋ ${e.name} ใช้เวทสวน ${ch.card.name} ยกเลิกเวท ${c.name}`); return null; }
+        if (ch) { this.emit({ t: "react", id: ch.card.id, by: this.P.indexOf(e) }); e.hand.splice(e.hand.indexOf(ch.card), 1); e.grave.push(ch.card); e.reacted = true; this.log(`✋ ${e.name} ใช้เวทสวน ${ch.card.name} ยกเลิกเวท ${c.name}`); return null; }
       }
       this.run(p, c.spell, c); this.checkEnd(); return null;
     }
@@ -574,6 +575,7 @@
       if (u.kinds.has("หมาป่า")) p.wolfAttacked = true;
       let t = target, o = { react };
       const bg = t === "face" ? [] : e.field.filter((x) => x.has("พรีกาย") && x !== t && !u.has("พิษ") && this.eff(e, x, false, u) + x.armor > this.eff(p, u, true, x));
+      this.emit({ t: "attack", a: u.uid, b: bg.length ? bg[0].uid : t === "face" ? "face" : t.uid, by: this.P.indexOf(p) });
       if (bg.length) { t = bg[0]; this.log(`🛡 ${t.name} รับแทน (พรีกาย)`); }
       else {
         this.log(t === "face" ? `⚔ ${u.name} โจมตีผู้เล่น ${e.name}` : `⚔ ${u.name} โจมตี ${t.name}`);
@@ -650,6 +652,7 @@
       if (!opts.length) return null;
       const choice = await react(d, { opts, targetIsPlayer: toPlayer, target, attacker: att });
       if (!choice) return null;
+      this.emit({ t: "react", id: choice.card.id, by: this.P.indexOf(d) });
       d.hand.splice(d.hand.indexOf(choice.card), 1); d.grave.push(choice.card); d.reacted = true;
       this.log(choice.kind === "counter" ? `✋ ${d.name} ใช้เวทสวน ${choice.card.name}` : `🛡 ${d.name} ทิ้ง ${choice.card.name} รับแทน (พรีกายจากมือ)`);
       return choice;
