@@ -337,7 +337,7 @@
       if (by === "cost") c = c.filter((u) => (u.card ? u.card.cost : 0) <= limit); else if (limit !== 99) c = c.filter((u) => this.eff(e, u) <= limit);
       return c.sort((a, b) => this.eff(e, b) - this.eff(e, a)).slice(0, n);
     }
-    place(p, c) { const u = new Unit(c); p.field.push(u); this.log(`✨ ${p.name} อัญเชิญ ${c.name}`); this.run(p, c.enter, c); this.checkOmega(p); return u; }
+    place(p, c) { const u = new Unit(c); p.field.push(u); this.emit({ t: "summon", id: c.id, by: this.P.indexOf(p) }); this.log(`✨ ${p.name} อัญเชิญ ${c.name}`); this.run(p, c.enter, c); this.checkOmega(p); return u; }
     discard(p, c) {
       const i = p.hand.indexOf(c); if (i >= 0) p.hand.splice(i, 1);
       p.grave.push(c); p.discTurn++; if (c.ondiscard.length) this.run(p, c.ondiscard, c);
