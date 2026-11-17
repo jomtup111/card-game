@@ -1326,8 +1326,23 @@
   }
 
   // ---------------------------------------------------------------- เดค
+  // สายที่ต้องมีการ์ดเผ่าอื่นเป็นคู่หู (สกิลแทบทุกใบอ้างถึงเผ่านั้น) → เดคอัตโนมัติผสมสายคู่หู
+  // นักฝึกสัตว์ + สัตว์ใหญ่: วัดแล้วดีสุด (~53%) เทียบหมาป่า 44 · นกล่าเหยื่อ 49 · แมลง 43 · ลูกมังกร 32 · ไข่ไดโน 18 · ไม่ผสม 11
+  const PARTNER = { "นักฝึกสัตว์": "สัตว์ใหญ่" };
   function buildDeck(cards, arch) {
     const pool = cards.filter((c) => c.archs.has(arch));
+    if (PARTNER[arch]) {
+      const deck = [], draw2 = cards.filter((c) => c.id === "NEU-SPL-16");
+      for (let i = 0; i < 4; i++) deck.push(...draw2);
+      for (const c of pool.filter((c) => !c.onlyone)) deck.push(c, c);
+      deck.push(...pool.filter((c) => c.onlyone).slice(0, 1));
+      const pp = cards.filter((c) => c.archs.has(PARTNER[arch]) && !c.onlyone && c.type === "มอน").sort((a, b) => a.cost - b.cost);
+      for (const c of pp) for (let i = 0; i < 2; i++) if (deck.length < 50) deck.push(c);
+      for (const c of pp) if (deck.length < 50 && deck.filter((x) => x === c).length < 4) deck.push(c);
+      const neutral = cards.filter((c) => c.races.has("กลาง") && !c.onlyone);
+      for (let i = 0; deck.length < 50; i++) deck.push(neutral[i % neutral.length]);
+      return deck.slice(0, 50);
+    }
     const raceCount = {}; for (const c of pool) for (const r of c.races) raceCount[r] = (raceCount[r] || 0) + 1;
     const race = Object.entries(raceCount).sort((a, b) => b[1] - a[1])[0][0];
     const grunt = cards.filter((c) => c.races.has(race) && c.archs.has("พลทหาร"));
