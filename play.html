@@ -401,6 +401,7 @@
                background: #1b1630d0; padding: 4px 6px; border-radius: 3px; }
   /* แถบสนามแต่ละฝั่ง + เส้นกลาง */
   .row.field { background: linear-gradient(90deg, transparent, #1b163055 15%, #1b163055 85%, transparent); border-radius: 50% / 12px; }
+  #board { z-index: 0; isolation: isolate; }   /* ชั้นในกระดานไม่ทะลุหน้าทับ (mulligan / หน้าแรก / หน้าต่าง) */
   #efield { align-self: end; } #mfield { align-self: start; }   /* สนามสองฝั่งชิดเส้นกลาง */
   .midline { position: relative; display: flex; justify-content: center; align-items: center; min-height: 26px; }
   .midline::before { content: ""; position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: linear-gradient(90deg, transparent, #e0b04090 20%, #e0b04090 80%, transparent); }
