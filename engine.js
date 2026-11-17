@@ -558,6 +558,7 @@
 
     run(p, acts, src = null, self = null) {
       const e = this.other(p), spell = src && src.type !== "มอน";
+      if (src && src.id && acts && acts.length && (self || spell)) this.emit({ t: "skill", id: src.id, by: this.P.indexOf(p), uid: self ? self.uid : null });   // หน้าจอ: ป้ายชื่อสกิล + เส้นแสงไปเป้า
       const prevMag = this.magnetFor; if (spell) this.magnetFor = e;
       try { this.runActs(p, e, acts, src, self, spell); } finally { this.magnetFor = prevMag; this.refresh(); }
     }
@@ -599,11 +600,11 @@
         else if (k === "lastatk") { if (this.lastPlaced && p.field.includes(this.lastPlaced)) this.lastPlaced.attacksLeft = Math.max(this.lastPlaced.attacksLeft, a[1]); }
         else if (k === "discard") { for (const c of [...p.hand].sort((x, y) => value(x) - value(y)).slice(0, a[1])) this.discard(p, c); }
         else if (k === "token") { if (a[3] && !this.count(p, a[3])) continue; this.addToken(p, a[1], a[2]); }
-        else if (k === "kill") { let [, n, lim, kind] = a; if (n === "elem") n = this.elem(p); if (!n) continue; const maxp = lim === "ค่าผสานธาตุ" ? this.elem(p) : lim ? +lim : null; for (const u of this.pick(e, n, maxp, kind)) this.kill(e, u, spell); }
-        else if (k === "bounce" || k === "bottom") { for (const u of this.pick(e, a[1], null, null, a[2], a[3])) { this.removeTo(e, u, k === "bounce" ? "hand" : "deck"); this.log(`${u.name} ถูกส่ง${k === "bounce" ? "กลับมือ" : "ไปใต้เดค"}`); } }
+        else if (k === "kill") { let [, n, lim, kind] = a; if (n === "elem") n = this.elem(p); if (!n) continue; const maxp = lim === "ค่าผสานธาตุ" ? this.elem(p) : lim ? +lim : null; for (const u of this.pick(e, n, maxp, kind)) { if (!spell) this.emit({ t: "hit", uid: u.uid }); this.kill(e, u, spell); } }
+        else if (k === "bounce" || k === "bottom") { for (const u of this.pick(e, a[1], null, null, a[2], a[3])) { this.emit({ t: "hit", uid: u.uid }); this.removeTo(e, u, k === "bounce" ? "hand" : "deck"); this.log(`${u.name} ถูกส่ง${k === "bounce" ? "กลับมือ" : "ไปใต้เดค"}`); } }
         else if (k === "curse") { for (const u of this.pick(e, a[1])) { this.emit({ t: "pow", uid: u.uid, n: -a[2] }); if (a[3]) u.power -= a[2]; else u.temp -= a[2]; if (this.eff(e, u) < 0) this.kill(e, u); } }
         else if (k === "freeze") { for (const u of this.pick(e, a[1], a[2])) { u.frozen = true; this.emit({ t: "freeze", uid: u.uid }); } }
-        else if (k === "steal") { if (p.field.length >= FIELD) continue; const t = this.pick(e, 1, a[1]); if (t.length) { const u = t[0]; e.field.splice(e.field.indexOf(u), 1); u.stolenFrom = e; u.attacksLeft = 1; p.field.push(u); this.log(`💘 ${p.name} ยึด ${u.name}`); } }
+        else if (k === "steal") { if (p.field.length >= FIELD) continue; const t = this.pick(e, 1, a[1]); if (t.length) { const u = t[0]; this.emit({ t: "hit", uid: u.uid }); e.field.splice(e.field.indexOf(u), 1); u.stolenFrom = e; u.attacksLeft = 1; p.field.push(u); this.log(`💘 ${p.name} ยึด ${u.name}`); } }
         else if (k === "buff") { const [, word, n, perm, every] = a; let tg = p.field.filter((u) => kindMatch(u.kinds, word) || ["มอนสเตอร์", ""].includes(normKind(word))); if (!every) tg = tg.sort((x, y) => this.eff(p, y) - this.eff(p, x)).slice(0, 1); for (const u of tg) { if (perm) u.power += n; else u.temp += n; } }
         else if (k === "search") { const [, word, op, lim] = a; for (let i = p.deck.length - 1; i >= 0; i--) { const c = p.deck[i]; if (kindMatch(c.kinds, word) && (lim == null || (op === "≤" ? c.cost <= lim : c.cost >= lim))) { p.deck.splice(i, 1); p.hand.push(c); break; } } }
         else if (k === "raise") { if (this.raiseBlocked(p)) continue; const [, word, lim, toField, n] = a; for (let i = 0; i < n; i++) { const cand = p.grave.filter((c) => kindMatch(c.kinds, word) && c.cost <= lim && !c.kw["หลับใหล"]); if (!cand.length) break; const c = cand.sort((x, y) => y.base - x.base)[0]; p.grave.splice(p.grave.indexOf(c), 1); if (toField && c.type === "มอน" && p.field.length < FIELD) this.place(p, c); else p.hand.push(c); } }

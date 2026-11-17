@@ -512,6 +512,15 @@
   @media (max-width: 999px) { #hist { display: none; } #board { padding-left: 110px; } }
   @media (max-width: 640px) { #board { padding-left: 6px; } }
   @media (max-height: 560px) { #hist { display: none; } }
+  /* ================= สกิล: ป้ายชื่อ + เส้นแสง ================= */
+  .skilltag { position: fixed; z-index: 34; pointer-events: none; transform: translate(-50%, -100%); white-space: nowrap; padding: 3px 10px; font-size: 14px; font-weight: 600;
+              color: #1b1630; background: linear-gradient(#ffe590, #e0b040); box-shadow: 0 0 0 2px #1b1630, 0 3px 0 #1b1630, 0 0 14px #ffd86099; animation: skilltag 1.1s ease-out forwards; }
+  .skilltag.opp { background: linear-gradient(#ffb0b8, #e06070); }
+  @keyframes skilltag { 0% { opacity: 0; transform: translate(-50%, -60%) scale(.6); } 15% { opacity: 1; transform: translate(-50%, -100%) scale(1.05); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -140%); } }
+  .beam { position: fixed; z-index: 33; pointer-events: none; height: 8px; transform-origin: 0 50%; border-radius: 4px;
+          background: linear-gradient(90deg, #fff6e000, #ffd860 30%, #fff6e0); box-shadow: 0 0 12px #ffd860, 0 0 4px #fff; }
+  .beam.opp { background: linear-gradient(90deg, #ffb0b800, #ff6070 30%, #ffe0e4); box-shadow: 0 0 12px #ff6070, 0 0 4px #fff; }
+  .beam.buff { background: linear-gradient(90deg, #7aff9a00, #6ad08a 30%, #e0ffe8); box-shadow: 0 0 12px #6ad08a, 0 0 4px #fff; }
   /* ================= อีโมต ================= */
   .emowheel { position: fixed; z-index: 40; display: grid; grid-template-columns: repeat(2, auto); gap: 6px; transform: translate(-50%, -100%); animation: endpop .2s ease-out; }
   .emowheel button { min-height: 38px; padding: 2px 14px; font-size: 15px; white-space: nowrap; }
@@ -895,6 +904,7 @@ async function drain() {
   draining = true;
   while (queue.length) {
     const v = queue.shift();
+    skillSrc = null;
     if (!FAST && V) for (const e of v.fx || []) await playFx(e, v);
     applyView(v);
   }
@@ -1100,8 +1110,34 @@ function histOf(e, v) {
     pushHist(unitCard(a).id, mine, "⚔", `${unitCard(a).name}${e.t === "gang" ? ` +${e.as.length - 1} รุม` : ""} ตี ${tgt}`);
   }
 }
+// สกิล: จุดเริ่มเส้นแสง (การ์ดที่ใช้สกิล) — จำไว้จนจบชุดเหตุการณ์ของ view นี้
+let skillSrc = null;
+function beam(from, toEl, kind) {
+  if (!from || !toEl) return; const [x1, y1] = from, [x2, y2] = center(rectOf(toEl)), len = Math.hypot(x2 - x1, y2 - y1); if (len < 20) return;
+  const b = document.createElement("div"); b.className = "beam " + (kind || ""); b.style.left = x1 + "px"; b.style.top = y1 - 4 + "px"; b.style.width = len + "px";
+  const ang = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI; fxLayer.appendChild(b);
+  b.animate([{ transform: `rotate(${ang}deg) scaleX(0)`, opacity: 1 }, { transform: `rotate(${ang}deg) scaleX(1)`, opacity: 1, offset: 0.45 }, { transform: `rotate(${ang}deg) scaleX(1)`, opacity: 0 }], { duration: 420 * SET.speed, easing: "ease-out" });
+  setTimeout(() => b.remove(), 440 * SET.speed);
+}
+function skillOrigin(e, v) {
+  const el = e.uid != null && unitEl(e.uid); if (el) return [center(rectOf(el)), el];
+  const mine = mineSeat(e.by, v), f = $(mine ? "mfield" : "efield"), r = rectOf(f);
+  if (ROW[e.id] && ROW[e.id].type !== "มอน") { const h = $(mine ? "mface" : "eface"); return [center(rectOf(h)), h]; }   // เวท: จากพระเอก
+  return [[r.left + r.width / 2, r.top + r.height / 2], f];                                                        // มอนที่เพิ่งลง: กลางสนามฝั่งนั้น
+}
 async function playFx(e, v) {
   try { histOf(e, v); } catch (err) { console.warn(err); }
+  if (e.t === "skill") {                                               // ป้ายชื่อสกิลเหนือการ์ดที่ใช้
+    const [pt, el] = skillOrigin(e, v), mine = mineSeat(e.by, v), r = rectOf(el); skillSrc = { pt, mine };
+    const d = document.createElement("div"); d.className = "skilltag" + (mine ? "" : " opp");
+    d.textContent = "✦ " + (ROW[e.id] ? ROW[e.id].name : "สกิล"); d.style.left = r.left + r.width / 2 + "px"; d.style.top = Math.max(30, r.top - 4) + "px";
+    d.style.animationDuration = 1100 * SET.speed + "ms"; document.body.appendChild(d); setTimeout(() => d.remove(), 1150 * SET.speed);
+    await sleep(160); return;
+  }
+  if (skillSrc && ["zap", "hit", "pow", "freeze", "shield"].includes(e.t)) {     // เส้นแสงจากการ์ดที่ใช้สกิลไปหาเป้า
+    const t = unitEl(e.uid); if (t) { beam(skillSrc.pt, t, e.t === "pow" && e.n > 0 ? "buff" : skillSrc.mine ? "" : "opp"); await sleep(160); }
+  }
+  if (e.t === "hit") { const t = unitEl(e.uid); if (t) { impact(t); SFX.play("hit"); await sleep(180); } return; }
   if (e.t === "attack") {
     const a = unitEl(e.a); if (!a) return;
     const mine = a.parentElement.id === "mfield";
