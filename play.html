@@ -1658,7 +1658,7 @@ setInterval(() => {
 }, 500);
 
 // ---------------------------------------------------------------- ติดตั้งเป็นแอป (PWA)
-if ("serviceWorker" in navigator && location.protocol.startsWith("http") && !/^(localhost|127\.)/.test(location.hostname)) navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator && location.protocol.startsWith("http") && !/^(localhost|127\.)/.test(location.hostname)) navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready).then((r) => r.active && r.active.postMessage("warm")).catch(() => {});   // เปิดเกมทุกครั้ง: เก็บรูปที่ยังขาดให้ครบ (เล่นออฟไลน์ได้ทุกใบ)
 let installEvt = null;
 addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installbtn").hidden = false; });
 $("installbtn").onclick = async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; $("installbtn").hidden = true; };
