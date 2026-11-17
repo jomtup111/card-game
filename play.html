@@ -474,6 +474,25 @@
     #endturn { width: 64px; height: 64px; font-size: 12px; right: 8px; top: 50%; bottom: auto; transform: translateY(-50%); }
     .topbtns button { width: 34px; height: 30px; font-size: 14px; }
   }
+  /* ================= แถบประวัติ + โชว์การ์ดศัตรู ================= */
+  #hist { position: fixed; left: 10px; top: 70px; z-index: 11; display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
+  #hist:empty { display: none; }
+  #hist .hi { position: relative; width: 54px; height: 54px; background: #2a2244 center / cover; box-shadow: 0 0 0 3px var(--hc), 0 0 0 5px #1b1630, 0 4px 6px #000a;
+              display: flex; align-items: flex-end; justify-content: center; overflow: hidden; cursor: help; animation: histin .3s ease-out; }
+  #hist .hi img { width: 44px; image-rendering: pixelated; }
+  #hist .hi i { position: absolute; right: -2px; top: -2px; font-style: normal; font-size: 13px; background: #1b1630; padding: 1px 3px; line-height: 1.2; }
+  #hist .hi.me { --hc: #6ad08a; } #hist .hi.opp { --hc: #ff6070; }
+  #hist .hi:nth-child(n+6) { opacity: .65; }
+  @keyframes histin { from { transform: translateX(-40px); opacity: 0; } }
+  #board { padding-left: max(110px, 84px); }
+  #preview { left: 84px; }
+  .showcard.opp { justify-content: center; align-items: flex-start; padding-left: 12vw; background: linear-gradient(90deg, #000a, transparent 60%); }
+  .showcard.opp b { color: #ffb0b8; }
+  .keyhelp { font-size: 12.5px; color: var(--dim); line-height: 1.7; margin-top: 4px; }
+  .keyhelp kbd { font-family: "Press Start 2P"; font-size: 9px; background: #1b1630; padding: 2px 5px; box-shadow: 0 2px 0 #000; color: var(--fg); }
+  @media (max-width: 999px) { #hist { display: none; } #board { padding-left: 110px; } }
+  @media (max-width: 640px) { #board { padding-left: 6px; } }
+  @media (max-height: 560px) { #hist { display: none; } }
   /* ================= ตั้งค่า ================= */
   .setbox { width: min(440px, 100%); }
   .setbox .srow { display: flex; align-items: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
@@ -558,6 +577,7 @@
   </div>
   <div id="side" class="panel"><h3 class="px-text" style="margin:4px 6px">บันทึกเกม</h3><div id="log"></div></div>
   <div id="preview"></div>
+  <div id="hist" title="การ์ดที่เพิ่งเล่น (ชี้เพื่อดู)"></div>
 </div>
 
 <div id="title">
@@ -969,7 +989,38 @@ async function lunge(a, t) {
   setTimeout(() => (a.style.zIndex = ""), 540);
 }
 function impact(t) { const [tx, ty] = center(rectOf(t)); sprite("img/ui_hit.png", "hit", [tx, ty], 420); SFX.play("hit"); t.classList.remove("shake"); void t.offsetWidth; t.classList.add("shake"); flash(t); }
+// แถบประวัติ: การ์ดที่เพิ่งเล่น (ใหม่สุดอยู่บน เก็บ 8 อัน)
+// การ์ดที่เพิ่งเล่นขยายใหญ่ (ศัตรู: ฝั่งซ้าย นานขึ้นให้อ่านสกิลทัน)
+async function showPlayed(id, text, opp) {
+  const ms = (opp ? 1500 : 950) * SET.speed, d = document.createElement("div"); d.className = "showcard" + (opp ? " opp" : "");
+  d.style.animationDuration = ms + "ms";
+  d.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:10px"><b class="px-text">${esc(text)}</b></div>`;
+  d.firstChild.appendChild(cardEl(ROW[id])); document.body.appendChild(d);
+  await new Promise((r) => setTimeout(r, ms)); d.remove();
+}
+function pushHist(id, mine, icon, text) {
+  const r = ROW[id]; if (!r) return;
+  const d = document.createElement("div"); d.className = "hi " + (mine ? "me" : "opp");
+  d.style.setProperty("--hc", mine ? "#6ad08a" : "#ff6070");
+  d.innerHTML = `${r.art ? `<img src="img/${r.art}.png" alt="">` : ""}<i>${icon}</i>`; d.title = text;
+  d.addEventListener("pointerenter", () => { const p = $("preview"); p.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><b class="px-text" style="font-size:16px">${esc(text)}</b></div>`; p.firstChild.appendChild(cardEl(r)); p.classList.add("on"); });
+  d.addEventListener("pointerleave", () => $("preview").classList.remove("on"));
+  const h = $("hist"); h.prepend(d); while (h.children.length > 8) h.lastChild.remove();
+}
+function histOf(e, v) {
+  const nm = (by) => (mineSeat(by, v) ? "คุณ" : v.opp.name);
+  const unitById = (uid) => V && [...V.me.field, ...V.opp.field].find((x) => x.uid === uid);
+  if (e.t === "summon") pushHist(e.id, mineSeat(e.by, v), "✨", `${nm(e.by)} อัญเชิญ ${ROW[e.id] ? ROW[e.id].name : ""}`);
+  else if (e.t === "cast") pushHist(e.id, mineSeat(e.by, v), "🔮", `${nm(e.by)} ร่ายเวท ${ROW[e.id] ? ROW[e.id].name : ""}`);
+  else if (e.t === "react") pushHist(e.id, mineSeat(e.by, v), "✋", `${nm(e.by)} ใช้เวทสวน ${ROW[e.id] ? ROW[e.id].name : ""}`);
+  else if (e.t === "attack" || e.t === "gang") {
+    const a = unitById(e.t === "gang" ? e.as[0] : e.a); if (!a) return;
+    const mine = V.me.field.includes(a), tgt = e.b === "face" ? (mine ? v.opp.name : "คุณ") : (() => { const t = unitById(e.b); return t ? unitCard(t).name : "?"; })();
+    pushHist(unitCard(a).id, mine, "⚔", `${unitCard(a).name}${e.t === "gang" ? ` +${e.as.length - 1} รุม` : ""} ตี ${tgt}`);
+  }
+}
 async function playFx(e, v) {
+  try { histOf(e, v); } catch (err) { console.warn(err); }
   if (e.t === "attack") {
     const a = unitEl(e.a); if (!a) return;
     const mine = a.parentElement.id === "mfield";
@@ -982,12 +1033,10 @@ async function playFx(e, v) {
   } else if (e.t === "cast" || e.t === "react") {
     const who = e.by === v.seat ? "คุณ" : v.opp.name;
     SFX.play(e.t === "cast" ? "cast" : "react");
-    const d = document.createElement("div"); d.className = "showcard";
-    d.innerHTML = `<b class="px-text">${esc(who)} ${e.t === "cast" ? "ร่ายเวท" : "ใช้เวทสวน!"}</b>`;
-    d.appendChild(cardEl(ROW[e.id])); document.body.appendChild(d);
-    await sleep(950); d.remove();
+    await showPlayed(e.id, `${who} ${e.t === "cast" ? "ร่ายเวท" : "ใช้เวทสวน!"}`, !mineSeat(e.by, v));
   } else if (e.t === "summon") {                                       // การ์ดบินจากมือลงสนาม (+ ฉากเปิดตัวหัวหน้า)
     const mine = mineSeat(e.by, v), from = mine ? document.querySelector(`#mhand .card[data-id="${e.id}"]`) || $("mhand") : $("ehand");
+    if (!mine && !(ROW[e.id] && ROW[e.id].leader)) await showPlayed(e.id, `${v.opp.name} อัญเชิญ`, true);
     flyCard(rectOf(from), rectOf($(mine ? "mfield" : "efield")), { id: e.id, ms: 380 }); await sleep(260);
     if (ROW[e.id] && ROW[e.id].leader) {
       SFX.play("win"); const d = document.createElement("div"); d.className = "leader-scene";
@@ -1246,6 +1295,32 @@ function clickUnit(x) {
 }
 $("eface").onclick = () => { const a = mode === "attack" && !gang.length && V.me.field.find((x) => x.uid === sel); if (a && a.targets.includes("face")) act({ t: "attack", uid: sel, target: "face" }); };
 $("cancel").onclick = () => { mode = "idle"; sel = null; gang = []; fodder = new Set(); render(); };
+// ปุ่มลัด (คอม): Esc/คลิกขวา = ยกเลิก · Space = จบเทิร์น · 1–9 = เล่นการ์ดในมือ · Enter = ยืนยัน
+function shortcutCancel() {
+  const z = document.querySelector(".zoom"); if (z) { z.remove(); return true; }
+  const st = document.querySelector(".setbox"); if (st) { st.closest(".modal").remove(); return true; }
+  if ($("side").classList.contains("open")) { $("side").classList.remove("open"); return true; }
+  if ($("cancel").style.display !== "none" && V) { $("cancel").click(); return true; }
+  return false;
+}
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest && e.target.closest("input, select, textarea")) return;
+  if (e.key === "Escape") { if (shortcutCancel()) e.preventDefault(); return; }
+  if (!V || $("title").style.display !== "none" || !$("builder").hidden) return;
+  if (document.querySelector(".modal") && !document.querySelector("#mullscreen")) return;
+  if (e.key === " " || e.code === "Space") {
+    e.preventDefault(); if (!$("endturn").disabled) $("endturn").click(); return;
+  }
+  if (e.key === "Enter") {
+    const b = $("mullgo") || ($("dosum") && !$("dosum").disabled ? $("dosum") : null); if (b) { e.preventDefault(); b.click(); } return;
+  }
+  if (/^[1-9]$/.test(e.key)) {
+    const k = +e.key - 1;
+    if ($("mullscreen")) { const c = document.querySelectorAll("#mullscreen .card")[k]; if (c) c.click(); return; }
+    if (V.me.hand[k] && V.myTurn && (mode === "idle" || mode === "pay")) clickHand(V.me.hand[k], k);
+  }
+});
+$("board").addEventListener("contextmenu", (e) => { if (shortcutCancel() || V) e.preventDefault(); });
 $("endturn").onclick = () => { if (mode === "idle" && V.myTurn) act({ t: "end" }); };
 $("logbtn").onclick = (e) => { e.stopPropagation(); $("side").classList.toggle("open"); };
 document.addEventListener("click", (e) => { if (!$("side").contains(e.target)) $("side").classList.remove("open"); });
@@ -1336,7 +1411,7 @@ function notice(title, body) {
 
 // ---------------------------------------------------------------- เริ่มเกม
 function newSession(seats, names, decks, opts = {}) {
-  overShown = false; V = null; queue.length = 0; $("log").innerHTML = ""; $("title").style.display = "none";
+  overShown = false; V = null; queue.length = 0; $("log").innerHTML = ""; $("hist").innerHTML = ""; $("title").style.display = "none";
   S = new Session({ cards: ALL, decks, names, seats, seed: Date.now() & 0x7fffffff,
     onView: (i, v) => { if (i === 0) setView(v); else if (conn && conn.open) conn.send({ type: "view", v }); },
     onLog: (s) => { log(s); NET.logs.push(s); if (NET.logs.length > 400) NET.logs.shift(); if (conn && conn.open) conn.send({ type: "log", s }); },
@@ -1403,6 +1478,7 @@ function openSettings() {
     <div class="srow"><span>คำแนะนำในเกม</span>${seg("hints", [[true, "เปิด"], [false, "ปิด"]])}</div>
     <div class="srow"><span>ชี้การ์ดแล้วบอกเอฟเฟกต์</span>${seg("tips", [[true, "เปิด"], [false, "ปิด"]])}</div>
     <p class="muted" style="font-size:12.5px">คำแนะนำในเกม = เด้งบอกวิธีเล่นครั้งแรกที่เจอแต่ละสถานการณ์ (เหมือนโหมดฝึกเล่น) ใช้กับเกมกับบอท</p>
+    <div class="keyhelp"><b>ปุ่มลัด (คอม):</b> <kbd>1</kbd>–<kbd>9</kbd> เล่นการ์ดในมือ · <kbd>Enter</kbd> ยืนยันอัญเชิญ / mulligan · <kbd>Space</kbd> จบเทิร์น · <kbd>Esc</kbd> หรือ<b>คลิกขวา</b> ยกเลิก</div>
     <div class="btns"><button class="main" id="setok">เสร็จ</button></div></div>`;
   const vol = m.querySelector("#svol"), vv = m.querySelector("#svolv"), showV = () => (vv.textContent = vol.value);
   showV(); vol.oninput = () => { SFX.setVol(+vol.value); showV(); soundIcons(); };
@@ -1453,7 +1529,7 @@ function checkRemoteDeck(d) {
 const rematch = { me: null, guest: null };
 function resetForNewGame() {
   NET.logs = []; NET.askP = null;
-  overShown = false; V = null; queue.length = 0; mode = "idle"; sel = null; fodder = new Set(); $("log").innerHTML = "";
+  overShown = false; V = null; queue.length = 0; mode = "idle"; sel = null; fodder = new Set(); $("log").innerHTML = ""; $("hist").innerHTML = "";
   for (const m of document.querySelectorAll(".modal")) m.remove();
   rematch.me = rematch.guest = null;
 }
