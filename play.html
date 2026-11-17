@@ -439,6 +439,14 @@
   @keyframes pvin { from { opacity: 0; transform: translate(-10px, -50%); } }
   @media (max-width: 999px) { #preview { display: none !important; } }
   @media (min-width: 1700px) and (min-height: 561px) { #endturn { right: calc(50% - 760px); } }   /* จอกว้างมาก: ปุ่มจบเทิร์นไม่ไปไกลขอบ */
+  #menubtn { display: none; }
+  @media (max-width: 640px) {                                         /* จอแคบ: รวมปุ่มเป็นเมนู ☰ เดียว ไม่ทับพัดการ์ดศัตรู */
+    #menubtn { display: inline-flex; }
+    .topbtns { flex-direction: column; align-items: flex-end; }
+    .topbtns button:not(#menubtn) { display: none !important; }
+    .topbtns.open button:not(#menubtn) { display: inline-flex !important; }
+    .topbtns.open { background: #1b1630e8; padding: 4px; box-shadow: 0 0 0 2px #e0b04080; }
+  }
   .topbtns { position: absolute; top: 8px; right: 10px; z-index: 12; display: flex; gap: 6px; }
   .topbtns button { width: 44px; height: 40px; min-height: 0; padding: 0; font-size: 18px; justify-content: center; }
   #board { padding: 6px 110px 0 110px; grid-template-rows: auto auto 1fr auto 1fr auto auto auto; }
@@ -603,7 +611,7 @@
 <div id="app">
   <div id="board">
     <div class="opphand" id="ehand" title="การ์ดในมือศัตรู"></div>
-    <div class="topbtns"><button id="logbtn" title="บันทึกเกม">📜</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button><button id="bugbtn" title="รายงานบัค">🐞</button><button id="setbtn" title="ตั้งค่า">⚙</button><button id="quitbtn" title="ออกจากเกม">⏏</button></div>
+    <div class="topbtns"><button id="menubtn" title="เมนู">☰</button><button id="logbtn" title="บันทึกเกม">📜</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button><button id="bugbtn" title="รายงานบัค">🐞</button><button id="setbtn" title="ตั้งค่า">⚙</button><button id="quitbtn" title="ออกจากเกม">⏏</button></div>
     <div class="mat"><img class="emblem" src="img/ui_emblem.png" alt=""></div>
     <div class="herorow opp">
       <div class="piles"><span class="pile" id="edeck"></span><span class="pile" id="egrave"></span><span class="muted" id="earch"></span></div>
@@ -804,7 +812,7 @@ function layout() {
   set("--cs", r(s));
   // พระเอก / มือ / มอน: แบ่งความสูงจอ
   const hz = Math.round(short ? Math.max(46, vh * 0.13) : Math.max(64, Math.min(160, vh * 0.12)));
-  const hs = Math.max(1, Math.min(2.7, (short ? 0.24 : 0.2) * vh / (96 * 0.78), (vw - 20) / (64 * (narrow ? 3.1 : 6))));
+  const hs = Math.max(1, Math.min(2.7, (short ? 0.24 : 0.2) * vh / (96 * 0.78), (vw - 20) / (64 * (narrow ? 2.6 : 6))));
   const handH = 96 * hs * 0.78, oh = short ? 22 : hz * 0.5, heroRows = short ? 0 : 2 * hz + 20, mid = short ? 18 : 30;
   const fieldH = (vh - oh - heroRows - mid - handH - 24) / 2;
   const sidePad = narrow ? 20 : short ? hz * 1.9 + 100 : 240;
@@ -1717,6 +1725,9 @@ function openSettings() {
   m.onclick = (e) => { if (e.target === m) m.remove(); };
   document.body.appendChild(m);
 }
+$("menubtn").onclick = (e) => { e.stopPropagation(); document.querySelector(".topbtns").classList.toggle("open"); };
+document.addEventListener("click", (e) => { const t = document.querySelector(".topbtns"); if (t && !t.contains(e.target)) t.classList.remove("open"); });
+for (const b of document.querySelectorAll(".topbtns button:not(#menubtn)")) b.addEventListener("click", () => document.querySelector(".topbtns").classList.remove("open"));
 $("setbtn").onclick = $("settitle").onclick = (e) => { e.stopPropagation(); openSettings(); };
 $("quitbtn").onclick = () => {
   const m = document.createElement("div"); m.className = "modal";
