@@ -148,6 +148,29 @@
   .box .cards { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 12px 0; }
   .box .btns { display: flex; gap: 10px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
   .muted { color: var(--dim); font-size: 13px; }
+  /* ตัวละครขยับ: หายใจ (squash) · ตัวบินลอย · โดนตีกะพริบ · แช่แข็ง */
+  .field .card .art img { transform-origin: 50% 100%; animation: idle 2.2s ease-in-out infinite; }
+  .field .card.flyer .art img { animation: hover 1.8s ease-in-out infinite; }
+  @keyframes idle { 50% { transform: scale(1.035, .97); } }
+  @keyframes hover { 50% { transform: translateY(-5%); } }
+  .field .card.frozen .art img { animation: none; filter: saturate(.25) brightness(1.25) sepia(.2) hue-rotate(170deg); }
+  .field .card .art img.hurtflash { animation: hurtflash .35s; }
+  @keyframes hurtflash { 0%, 60% { filter: brightness(4) saturate(0); transform: translateX(6%); } 100% { filter: none; } }
+  #app.quake { animation: quake .4s; }
+  @keyframes quake { 20% { transform: translate(-6px, 3px); } 40% { transform: translate(6px, -3px); } 60% { transform: translate(-4px, -2px); } 80% { transform: translate(3px, 2px); } }
+  .fly { position: fixed; z-index: 31; pointer-events: none; width: 46px; height: 69px; image-rendering: pixelated; }
+  .fly.card { width: auto; height: auto; }
+  .pfx { position: absolute; image-rendering: pixelated; pointer-events: none; }
+  .powpop { position: absolute; font-family: "Press Start 2P"; font-size: 24px; pointer-events: none; animation: powpop .9s ease-out forwards; }
+  @keyframes powpop { 0% { transform: translate(-50%, 0) scale(.5); opacity: 0; } 25% { transform: translate(-50%, -14px) scale(1.3); opacity: 1; } 100% { transform: translate(-50%, -46px) scale(1); opacity: 0; } }
+  .leader-scene { position: fixed; inset: 0; z-index: 27; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none;
+                  background: radial-gradient(circle, #fff8 0%, #ffd86055 25%, #1b1630e0 70%); animation: leader 1.5s ease-out forwards; }
+  .leader-scene .card { --s: 3.6; animation: leadercard 1.5s cubic-bezier(.2, 1.3, .4, 1) forwards; }
+  .leader-scene b { font-size: 30px; color: var(--hi); }
+  @keyframes leader { 0% { opacity: 0; } 10% { opacity: 1; background-color: #fff; } 80% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes leadercard { 0% { transform: scale(.2) rotate(-20deg); } 40% { transform: scale(1.1) rotate(3deg); } 60%, 100% { transform: scale(1) rotate(0); } }
+  .endfade { position: fixed; inset: 0; z-index: 19; background: #000; pointer-events: none; animation: endfade 1.2s forwards; }
+  @keyframes endfade { to { opacity: .65; } }
   .fxlayer { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
   .fx { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; }
   .fx.hit { animation: hit .4s ease-out forwards; }
@@ -550,7 +573,7 @@ function applyView(v) {
     if (died) SFX.play("die"); else if (entered) SFX.play("summon");
     for (const [side, id] of [["me", "mhp"], ["opp", "ehp"]]) {
       const lost = prev[side].hp - V[side].hp;
-      if (lost > 0) { SFX.play("hurt"); const h = $(id); h.classList.remove("shake"); void h.offsetWidth; h.classList.add("shake"); floatText(h.getBoundingClientRect(), `-${lost}`); }
+      if (lost > 0) { SFX.play("hurt"); $("app").classList.remove("quake"); void $("app").offsetWidth; $("app").classList.add("quake"); const h = $(id); h.classList.remove("shake"); void h.offsetWidth; h.classList.add("shake"); floatText(h.getBoundingClientRect(), `-${lost}`); }
     }
     if (V.phase === "play" && (prev.phase !== "play" || prev.turn !== V.turn)) { banner(V.myTurn ? "ตาคุณ!" : `ตาของ ${V.whoseTurn}`); if (V.myTurn) SFX.play("turn"); }
   }
@@ -608,18 +631,52 @@ function dieFx(r, el) {
   fxLayer.appendChild(g); setTimeout(() => g.remove(), 560); sprite("img/ui_puff.png", "puff", center(r), 600);
 }
 function banner(t) { const b = document.createElement("div"); b.className = "banner px-text"; b.textContent = t; document.body.appendChild(b); setTimeout(() => b.remove(), 1100); }
+// ตำแหน่งบนจอ
+const unitEl = (uid) => document.querySelector(`.field .card[data-uid="${uid}"]`);
+const rectOf = (el) => el && el.getBoundingClientRect();
+const mineSeat = (by, v) => by === v.seat;
+function flash(el) { const img = el && el.querySelector(".art img"); if (!img) return; img.classList.remove("hurtflash"); void img.offsetWidth; img.classList.add("hurtflash"); }
+// อนุภาคพิกเซลกระจายจากจุดเดียว
+function burst(src, [x, y], n, spread = 60, ms = 650, size = 18) {
+  for (let k = 0; k < n; k++) {
+    const i = document.createElement("img"); i.src = src; i.className = "pfx"; i.style.width = size + "px"; i.style.left = x - size / 2 + "px"; i.style.top = y - size / 2 + "px";
+    fxLayer.appendChild(i);
+    const a = Math.random() * Math.PI * 2, d = spread * (0.5 + Math.random() * 0.7);
+    i.animate([{ transform: "translate(0,0) rotate(0)", opacity: 1 }, { transform: `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d + 20}px) rotate(${(Math.random() - 0.5) * 540}deg)`, opacity: 0 }],
+      { duration: ms * (0.8 + Math.random() * 0.4), easing: "cubic-bezier(.2,.7,.4,1)", fill: "forwards" });
+    setTimeout(() => i.remove(), ms * 1.3);
+  }
+}
+// การ์ด (หรือหลังการ์ด) บินจาก A ไป B
+function flyCard(from, to, { id = null, ms = 450, delay = 0, shrink = false } = {}) {
+  if (!from || !to) return;
+  const el = id ? cardEl(ROW[id]) : document.createElement("img");
+  if (id) { el.classList.add("fly"); el.style.setProperty("--s", "0.9"); } else { el.src = "img/ui_cardback.png"; el.className = "fly"; }
+  const [fx0, fy0] = center(from), [tx, ty] = center(to);
+  el.style.left = fx0 + "px"; el.style.top = fy0 + "px"; el.style.opacity = 0; fxLayer.appendChild(el);
+  if (id) requestAnimationFrame(() => fitCard(el));
+  el.animate([{ transform: "translate(-50%,-50%) scale(.6) rotate(-8deg)", opacity: 1 }, { transform: `translate(calc(${tx - fx0}px - 50%), calc(${ty - fy0}px - 50%)) scale(${shrink ? 0.3 : 1}) rotate(4deg)`, opacity: shrink ? 0.2 : 1 }],
+    { duration: ms, delay, easing: "cubic-bezier(.3,.6,.4,1)", fill: "forwards" });
+  setTimeout(() => el.remove(), ms + delay + 30);
+}
+async function lunge(a, t) {
+  const [ax, ay] = center(rectOf(a)), [tx, ty] = center(rectOf(t));
+  a.style.zIndex = 5;
+  a.animate([{ transform: "none" }, { transform: `translate(${(ax - tx) * 0.12}px, ${(ay - ty) * 0.12}px)`, offset: 0.25 },
+             { transform: `translate(${(tx - ax) * 0.75}px, ${(ty - ay) * 0.75}px) scale(1.08)`, offset: 0.55 }, { transform: "none" }], { duration: 520, easing: "ease-in-out" });
+  setTimeout(() => (a.style.zIndex = ""), 540);
+}
+function impact(t) { const [tx, ty] = center(rectOf(t)); sprite("img/ui_hit.png", "hit", [tx, ty], 420); SFX.play("hit"); t.classList.remove("shake"); void t.offsetWidth; t.classList.add("shake"); flash(t); }
 async function playFx(e, v) {
   if (e.t === "attack") {
-    const a = document.querySelector(`.field .card[data-uid="${e.a}"]`); if (!a) return;
+    const a = unitEl(e.a); if (!a) return;
     const mine = a.parentElement.id === "mfield";
-    const t = e.b === "face" ? $(mine ? "ehp" : "mhp") : document.querySelector(`.field .card[data-uid="${e.b}"]`); if (!t) return;
-    const [ax, ay] = center(a.getBoundingClientRect()), [tx, ty] = center(t.getBoundingClientRect());
-    a.style.zIndex = 5; SFX.play("attack");
-    a.animate([{ transform: "none" }, { transform: `translate(${(ax - tx) * 0.12}px, ${(ay - ty) * 0.12}px)`, offset: 0.25 },
-               { transform: `translate(${(tx - ax) * 0.75}px, ${(ty - ay) * 0.75}px) scale(1.08)`, offset: 0.55 }, { transform: "none" }], { duration: 520, easing: "ease-in-out" });
-    await sleep(290);
-    sprite("img/ui_hit.png", "hit", [tx, ty], 420); SFX.play("hit"); t.classList.remove("shake"); void t.offsetWidth; t.classList.add("shake");
-    await sleep(300); a.style.zIndex = "";
+    const t = e.b === "face" ? $(mine ? "ehp" : "mhp") : unitEl(e.b); if (!t) return;
+    SFX.play("attack"); lunge(a, t); await sleep(290); impact(t); await sleep(300);
+  } else if (e.t === "gang") {                                         // รุมตี: พุ่งพร้อมกันทุกตัว
+    const as = e.as.map(unitEl).filter(Boolean), t = unitEl(e.b); if (!as.length || !t) return;
+    SFX.play("attack"); as.forEach((a, k) => setTimeout(() => lunge(a, t), k * 70)); await sleep(290 + as.length * 70);
+    impact(t); burst("img/ui_star.png", center(rectOf(t)), 10, 70); await sleep(350);
   } else if (e.t === "cast" || e.t === "react") {
     const who = e.by === v.seat ? "คุณ" : v.opp.name;
     SFX.play(e.t === "cast" ? "cast" : "react");
@@ -627,11 +684,52 @@ async function playFx(e, v) {
     d.innerHTML = `<b class="px-text">${esc(who)} ${e.t === "cast" ? "ร่ายเวท" : "ใช้เวทสวน!"}</b>`;
     d.appendChild(cardEl(ROW[e.id])); document.body.appendChild(d);
     await sleep(950); d.remove();
+  } else if (e.t === "summon") {                                       // การ์ดบินจากมือลงสนาม (+ ฉากเปิดตัวหัวหน้า)
+    const mine = mineSeat(e.by, v), from = mine ? document.querySelector(`#mhand .card[data-id="${e.id}"]`) || $("mhand") : $("ehand");
+    flyCard(rectOf(from), rectOf($(mine ? "mfield" : "efield")), { id: e.id, ms: 380 }); await sleep(260);
+    if (ROW[e.id] && ROW[e.id].leader) {
+      SFX.play("win"); const d = document.createElement("div"); d.className = "leader-scene";
+      d.innerHTML = `<b class="px-text">หัวหน้าลงสนาม!</b>`; d.appendChild(cardEl(ROW[e.id])); document.body.appendChild(d);
+      $("app").classList.remove("quake"); void $("app").offsetWidth; $("app").classList.add("quake");
+      await sleep(1300); d.remove();
+    }
+  } else if (e.t === "draw") {                                         // จั่ว: หลังการ์ดบินจากเดคเข้ามือ
+    const mine = mineSeat(e.by, v), from = rectOf($(mine ? "mdeck" : "edeck")), to = rectOf($(mine ? "mhand" : "ehand"));
+    for (let k = 0; k < Math.min(e.n, 4); k++) flyCard(from, to, { delay: k * 90, ms: 420 });
+  } else if (e.t === "discard") {                                      // ทิ้ง: การ์ดบินไปสุสาน
+    const mine = mineSeat(e.by, v), from = mine ? document.querySelector(`#mhand .card[data-id="${e.id}"]`) || $("mhand") : $("ehand");
+    flyCard(rectOf(from), rectOf($(mine ? "mgrave" : "egrave")), { id: e.id, ms: 420, shrink: true });
+    await sleep(60);
+  } else if (e.t === "zap") {                                          // ทำลายด้วยเวท: สายฟ้าฟาด
+    const t = unitEl(e.uid); if (!t) return; const [x, y] = center(rectOf(t));
+    const b = document.createElement("img"); b.src = "img/ui_bolt.png"; b.className = "pfx"; b.style.width = "56px"; b.style.left = x - 28 + "px"; b.style.top = y - 150 + "px"; fxLayer.appendChild(b);
+    b.animate([{ transform: "translateY(-60px)", opacity: 0 }, { transform: "translateY(40px)", opacity: 1, offset: 0.5 }, { transform: "translateY(60px)", opacity: 0 }], { duration: 380 });
+    setTimeout(() => b.remove(), 400); SFX.play("hit"); await sleep(200); flash(t); burst("img/ui_spark.png", [x, y], 10, 70, 600, 22); await sleep(150);
+  } else if (e.t === "shield") {                                       // โล่แสงแตก: เศษแสงกระจาย
+    const t = unitEl(e.uid); if (t) { burst("img/ui_shard.png", center(rectOf(t)), 16, 110, 800, 26); SFX.play("react"); }
+  } else if (e.t === "freeze") {
+    const t = unitEl(e.uid); if (t) { sprite("img/ui_ice.png", "hit", center(rectOf(t)), 500); burst("img/ui_ice.png", center(rectOf(t)), 7, 70, 700, 26); }
+  } else if (e.t === "hatch") {
+    const t = unitEl(e.uid); if (t) burst("img/ui_shell.png", center(rectOf(t)), 12, 90, 750, 26);
+  } else if (e.t === "pow") {                                          // บัฟ / ลด power: เลขเด้ง
+    const t = unitEl(e.uid); if (!t) return; const r = rectOf(t), d = document.createElement("div");
+    d.className = "powpop px-text"; d.textContent = (e.n > 0 ? "+" : "−") + Math.abs(e.n); d.style.color = e.n > 0 ? "var(--ok)" : "#ff7080";
+    d.style.left = r.left + r.width / 2 + "px"; d.style.top = r.top + r.height * 0.35 + "px"; fxLayer.appendChild(d); setTimeout(() => d.remove(), 950);
+    if (e.n > 0) burst("img/ui_spark.png", center(r), 8, 60, 700, 20);
+  } else if (e.t === "shoot") {                                        // ป้อมยิง: กระสุนพุ่ง
+    const a = unitEl(e.a), t = unitEl(e.b); if (!a || !t) return;
+    const [ax, ay] = center(rectOf(a)), [tx, ty] = center(rectOf(t)), b = document.createElement("img");
+    b.src = "img/ui_bullet.png"; b.className = "pfx"; b.style.width = "30px"; b.style.left = ax - 15 + "px"; b.style.top = ay - 9 + "px"; fxLayer.appendChild(b);
+    const ang = Math.atan2(ty - ay, tx - ax) * 180 / Math.PI;
+    b.animate([{ transform: `rotate(${ang}deg)` }, { transform: `translate(${tx - ax}px, ${ty - ay}px) rotate(${ang}deg)` }], { duration: 260, easing: "ease-in" });
+    SFX.play("attack"); await sleep(250); b.remove(); impact(t); await sleep(150);
   }
 }
 
 // ---------------------------------------------------------------- วาดกระดาน
 function hearts(n) { let h = ""; for (let i = 0; i < Engine.HP; i++) h += `<img src="img/ui_heart${i < n ? "" : "_empty"}.png" alt="">`; return h; }
+// ท่าขยับของมอนบนสนาม (CSS): ตัวบินลอยตัว · แช่แข็งหยุดนิ่งสีฟ้า
+const unitAnim = (x) => ((x.kws || []).includes("บิน") ? " flyer" : "") + ((x.status || []).some((s) => s.startsWith("❄")) ? " frozen" : "");
 function render() {
   if (!V) return;
   $("ename").textContent = V.opp.name; $("mname").textContent = V.me.name;
@@ -661,7 +759,7 @@ function render() {
   const ef = $("efield"); ef.innerHTML = "";
   for (const x of V.opp.field) {
     const hit = targets.includes(x.uid), st = hit ? [predOf(x), ...x.status] : x.status;
-    const el = cardEl(unitCard(x), { powerNow: x.power, status: st, pred: hit, cls: hit ? "target" : "", unit: x });
+    const el = cardEl(unitCard(x), { powerNow: x.power, status: st, pred: hit, cls: (hit ? "target" : "") + unitAnim(x), unit: x });
     el.dataset.uid = x.uid;
     el.onclick = () => { if (!hit) return; if (group.length > 1) act({ t: "gang", uids: group.map((g) => g.uid), target: x.uid }); else act({ t: "attack", uid: sel, target: x.uid }); };
     ef.appendChild(el);
@@ -672,7 +770,7 @@ function render() {
   const mf = $("mfield"); mf.innerHTML = "";
   for (const x of V.me.field) {
     const cls = !V.myTurn ? "" : mode === "attack" && (x.uid === sel || gang.includes(x.uid)) ? "sel" : !x.atkErr ? "ready click" : "click";
-    const el = cardEl(unitCard(x), { powerNow: x.power, status: x.status, cls, unit: x });
+    const el = cardEl(unitCard(x), { powerNow: x.power, status: x.status, cls: cls + unitAnim(x), unit: x });
     el.dataset.uid = x.uid;
     el.onclick = () => clickUnit(x); mf.appendChild(el);
   }
@@ -687,7 +785,7 @@ function render() {
     else if (mode === "mull") cls = fodder.has(k) ? "fodder click" : "click";
     else if (V.myTurn) cls = "click";
     if (h.dead) cls += " dead";
-    const el = cardEl(ROW[h.id], { costNow: h.costNow, cls });
+    const el = cardEl(ROW[h.id], { costNow: h.costNow, cls }); el.dataset.id = h.id;
     el.onclick = () => clickHand(h, k); hand.appendChild(el);
   });
   // สกิลที่กดใช้เอง (ฟื้นคืน / รีไซเคิล)
@@ -709,6 +807,7 @@ function render() {
     $("domull").onclick = () => { const idx = [...fodder]; act({ t: "mull", idx }); };
   } else $("paybox").innerHTML = "";
   for (const el of document.querySelectorAll("#board .card")) fitCard(el);   // ปรับขนาดทันที ไม่ให้กระพริบ
+  for (const el of document.querySelectorAll(".field .card[data-uid] .art img")) el.style.animationDelay = `${-((+el.closest(".card").dataset.uid * 0.37) % 2.2)}s`;   // ไม่ขยับพร้อมกัน
   if (tipAnchor && !tipAnchor.isConnected) hideTip();                       // การ์ดที่ชี้อยู่ถูกวาดใหม่แล้ว
   hints();
   if (!toastTimer) {
@@ -779,6 +878,13 @@ function pickDiscard(ab) {
 }
 function gameOver() {
   SFX.play(V.winner === "me" ? "win" : "lose");
+  if (!FAST && !gameOver.scened) {
+    gameOver.scened = true;
+    if (V.winner === "me") { for (let k = 0; k < 4; k++) setTimeout(() => burst("img/ui_star.png", [innerWidth * (0.2 + Math.random() * 0.6), innerHeight * (0.25 + Math.random() * 0.4)], 18, 160, 1100, 22), k * 250); banner("ชนะ!"); }
+    else { const d = document.createElement("div"); d.className = "endfade"; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); banner("แพ้…"); }
+    return setTimeout(gameOver, 1300);
+  }
+  gameOver.scened = false;
   if (role === "host" || role === "guest") return gameOverOnline();
   const m = document.createElement("div"); m.className = "modal";
   m.innerHTML = `<div class="box panel" style="text-align:center"><h2 class="px-text" style="font-size:30px">${V.winner === "me" ? "🏆 คุณชนะ!" : "💀 คุณแพ้"}</h2><p>จบที่เทิร์น ${V.turn}</p>

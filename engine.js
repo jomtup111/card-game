@@ -371,7 +371,11 @@
       for (const c of deck) this.decklist[c.id] = (this.decklist[c.id] || 0) + 1;
       Object.assign(this, { hand: [], field: [], grave: [], hp: HP, lost: null, turns: 0, fossil: {}, reacted: false, played: 0, wolfAttacked: false, discTurn: 0, spellUsed: 0, spellMax: 1, immune: false, overAll: 0, overNext: 0, gemAll: 0, nextRed: [] });
     }
-    draw(n = 1, log) { for (let i = 0; i < n; i++) { if (!this.deck.length) { this.lost = "เดคหมด"; return; } this.hand.push(this.deck.pop()); } }
+    draw(n = 1, log) {
+      let got = 0;
+      for (let i = 0; i < n; i++) { if (!this.deck.length) { this.lost = "เดคหมด"; break; } this.hand.push(this.deck.pop()); got++; }
+      if (got && this.onDraw) this.onDraw(got);
+    }
   }
 
   const value = (c) => {
@@ -386,6 +390,7 @@
       this.opt = Object.assign({ gang: 2 }, opt);   // ตีรวม (2026-11-17): รุมตีได้ เป้าฆ่ากลับ 1 ตัว · ทดลองปิดด้วย { gang: 0 }
       this.rnd = rngOf(seed); this.log = log;
       this.P = [new Player("คุณ", deckA, this.rnd), new Player("บอท", deckB, this.rnd)];
+      this.P.forEach((p, i) => (p.onDraw = (n) => this.emit({ t: "draw", by: i, n })));   // เหตุการณ์ให้หน้าจอ: จั่ว
       this.turn = 0; this.deaths = 0; this.cur = 0; this.winner = null; this.onFx = null;
       for (const p of this.P) p.draw(opt.hand0 || HAND0);
     }
@@ -466,6 +471,7 @@
     kill(owner, u, bySpell = false) {
       if (!owner.field.includes(u)) return;
       if (bySpell && u.has("spellproof")) return;
+      if (bySpell) this.emit({ t: "zap", uid: u.uid });
       if (owner.immune) { this.log(`${u.name} ไม่ตาย (คุ้มครอง)`); return; }
       if (u.save) { u.save = false; this.log(`${u.name} รอดจากความตาย`); return; }
       if (u.kinds.has("เครื่องจักร") && owner.hand.length && owner.mechSaveTurn !== this.turn && owner.field.some((o) => o !== u && o.h.mechSave)) {
@@ -474,7 +480,7 @@
       }
       if (u.kw["โล่แสง"] && u.shieldKeep) { u.shieldKeep = false; this.log(`${u.name} โล่แสงไม่แตก`); return; }
       if (u.kw["โล่แสง"]) {
-        u.kw["โล่แสง"] = false; this.log(`${u.name} โล่แสงแตก`);
+        u.kw["โล่แสง"] = false; this.log(`${u.name} โล่แสงแตก`); this.emit({ t: "shield", uid: u.uid });
         if (owner.shieldDrawTurn !== this.turn && this.fieldHas(owner, "onShieldDraw")) { owner.shieldDrawTurn = this.turn; this.extraDraw(owner, 1); }
         return;
       }
@@ -542,7 +548,7 @@
     enterFx(p, c, u) { this.run(p, c.enter, c, u); this.checkOmega(p); this.refresh(); }
     discard(p, c) {
       const i = p.hand.indexOf(c); if (i >= 0) p.hand.splice(i, 1);
-      p.grave.push(c); p.discTurn++; if (c.ondiscard.length) this.run(p, c.ondiscard, c);
+      p.grave.push(c); p.discTurn++; this.emit({ t: "discard", by: this.P.indexOf(p), id: c.id }); if (c.ondiscard.length) this.run(p, c.ondiscard, c);
       for (const o of p.field) if (o.h.onDiscardPow) o.temp += o.h.onDiscardPow;
     }
 
@@ -591,8 +597,8 @@
         else if (k === "token") { if (a[3] && !this.count(p, a[3])) continue; this.addToken(p, a[1], a[2]); }
         else if (k === "kill") { let [, n, lim, kind] = a; if (n === "elem") n = this.elem(p); if (!n) continue; const maxp = lim === "ค่าผสานธาตุ" ? this.elem(p) : lim ? +lim : null; for (const u of this.pick(e, n, maxp, kind)) this.kill(e, u, spell); }
         else if (k === "bounce" || k === "bottom") { for (const u of this.pick(e, a[1], null, null, a[2], a[3])) { this.removeTo(e, u, k === "bounce" ? "hand" : "deck"); this.log(`${u.name} ถูกส่ง${k === "bounce" ? "กลับมือ" : "ไปใต้เดค"}`); } }
-        else if (k === "curse") { for (const u of this.pick(e, a[1])) { if (a[3]) u.power -= a[2]; else u.temp -= a[2]; if (this.eff(e, u) < 0) this.kill(e, u); } }
-        else if (k === "freeze") { for (const u of this.pick(e, a[1], a[2])) u.frozen = true; }
+        else if (k === "curse") { for (const u of this.pick(e, a[1])) { this.emit({ t: "pow", uid: u.uid, n: -a[2] }); if (a[3]) u.power -= a[2]; else u.temp -= a[2]; if (this.eff(e, u) < 0) this.kill(e, u); } }
+        else if (k === "freeze") { for (const u of this.pick(e, a[1], a[2])) { u.frozen = true; this.emit({ t: "freeze", uid: u.uid }); } }
         else if (k === "steal") { if (p.field.length >= FIELD) continue; const t = this.pick(e, 1, a[1]); if (t.length) { const u = t[0]; e.field.splice(e.field.indexOf(u), 1); u.stolenFrom = e; u.attacksLeft = 1; p.field.push(u); this.log(`💘 ${p.name} ยึด ${u.name}`); } }
         else if (k === "buff") { const [, word, n, perm, every] = a; let tg = p.field.filter((u) => kindMatch(u.kinds, word) || ["มอนสเตอร์", ""].includes(normKind(word))); if (!every) tg = tg.sort((x, y) => this.eff(p, y) - this.eff(p, x)).slice(0, 1); for (const u of tg) { if (perm) u.power += n; else u.temp += n; } }
         else if (k === "search") { const [, word, op, lim] = a; for (let i = p.deck.length - 1; i >= 0; i--) { const c = p.deck[i]; if (kindMatch(c.kinds, word) && (lim == null || (op === "≤" ? c.cost <= lim : c.cost >= lim))) { p.deck.splice(i, 1); p.hand.push(c); break; } } }
@@ -612,7 +618,8 @@
           const when = fx.long ? "start" : "end";
           for (const u of tg) {
             const add = (v) => { if (fx.perm) u.power += v; else if (fx.long) u.temp2 += v; else u.temp += v; };
-            if (fx.pw != null) add(fx.pw * (fx.per ? (fx.per === "มอนสเตอร์ตาย" || fx.per === "ตาย" ? this.deaths : this.count(p, fx.per)) : 1));
+            if (fx.pw != null) { const v = fx.pw * (fx.per ? (fx.per === "มอนสเตอร์ตาย" || fx.per === "ตาย" ? this.deaths : this.count(p, fx.per)) : 1); add(v); if (v) this.emit({ t: "pow", uid: u.uid, n: v }); }
+            if (fx.mul) this.emit({ t: "pow", uid: u.uid, n: this.eff(p, u) * (fx.mul - 1) });
             if (fx.mul) add(this.eff(p, u) * (fx.mul - 1));
             if (fx.armor) { u.armor += fx.armor; if (!fx.perm) { const v = fx.armor; u.undo.push([when, () => (u.armor -= v)]); } }
             for (const kw of fx.kws) if (!u.kw[kw]) { u.kw[kw] = true; if (!fx.perm) u.undo.push([when, () => (u.kw[kw] = false)]); }
@@ -676,7 +683,7 @@
       const speed = p.field.some((o) => o.card && (o.card.ab.includes("ฟักเร็วขึ้น") || o.card.ab.includes("นับเวลาฟักเพิ่ม"))) ? 2 : 1;
       for (const u of [...p.field]) {
         if (!u.hatch) continue; u.hatch[0] -= speed; if (u.hatch[0] > 0) continue;
-        const [, pw, tgt] = u.hatch; u.hatch = null; u.noatk = false; if (pw != null) u.power = pw; this.log(`🥚 ${u.name} ฟักแล้ว`);
+        const [, pw, tgt] = u.hatch; u.hatch = null; u.noatk = false; if (pw != null) u.power = pw; this.log(`🥚 ${u.name} ฟักแล้ว`); this.emit({ t: "hatch", uid: u.uid });
         const m = tgt.match(/อัญเชิญ(\S+) cost ≤ (\d+)/);
         if (tgt.includes("อัญเชิญ") && m) { p.field.splice(p.field.indexOf(u), 1); this.run(p, [["cheat", m[1], +m[2], "เดค"]]); }
         if (tgt.includes("กินเหยื่อ")) u.kw["กินเหยื่อ"] = true; if (tgt.includes("บิน")) u.kw["บิน"] = true;
@@ -1091,7 +1098,7 @@
     }
     shootWith(p, u, bonus = 0) {
       const e = this.other(p);
-      for (let i = 0; i < (u.card && u.card.shoot2 ? 2 : 1); i++) { const t = this.pick(e, 1, u.shoot + bonus).filter((x) => !u.h.shootFly || x.has("บิน")); if (t.length) { this.log(`🔫 ${u.name} ยิง ${t[0].name}`); this.kill(e, t[0]); } }
+      for (let i = 0; i < (u.card && u.card.shoot2 ? 2 : 1); i++) { const t = this.pick(e, 1, u.shoot + bonus).filter((x) => !u.h.shootFly || x.has("บิน")); if (t.length) { this.log(`🔫 ${u.name} ยิง ${t[0].name}`); this.emit({ t: "shoot", a: u.uid, b: t[0].uid }); this.kill(e, t[0]); } }
     }
     // กติกาทดลอง: เทิร์นละครั้ง ทิ้ง 1 ใบ แล้วจั่ว 1 ใบ
     loot(p, c) {
@@ -1195,7 +1202,8 @@
     async attackGroup(p, us, t, react) {
       const err = this.canGang(p, us, t); if (err) return err;
       const e = this.other(p);
-      for (const u of us) { u.attacksLeft--; u.atkd = true; this.emit({ t: "attack", a: u.uid, b: t.uid, by: this.P.indexOf(p) }); }
+      for (const u of us) { u.attacksLeft--; u.atkd = true; }
+      this.emit({ t: "gang", as: us.map((u) => u.uid), b: t.uid, by: this.P.indexOf(p) });
       this.log(`⚔ ${us.map((u) => u.name).join(" + ")} รุมตี ${t.name}`);
       const lead = us.reduce((a, b) => (this.eff(p, a) >= this.eff(p, b) ? a : b));
       const r = await this.doReact(e, false, t, lead, react);
