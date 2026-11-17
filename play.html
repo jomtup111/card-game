@@ -367,13 +367,45 @@
   .card.minion .hl { display: none; }
 
   /* ---------- จอแคบ / มือถือ ---------- */
-  @media (max-width: 999px) {
-    #app { grid-template-columns: 1fr; }
-    #side { position: fixed; right: 0; top: 0; bottom: 0; width: min(320px, 88vw); margin: 0; z-index: 18; transform: translateX(105%); transition: transform .2s; }
-    #side.open { transform: none; }
-    #preview { display: none; }
-    #logbtn { display: inline-block; }
-  }
+  /* ================= UX รอบ 2: โต๊ะเต็มจอ ================= */
+  #app { grid-template-columns: 1fr; }
+  #side { position: fixed; right: 0; top: 0; bottom: 0; width: min(340px, 88vw); margin: 0; z-index: 85; transform: translateX(105%); transition: transform .2s; }
+  #side.open { transform: none; box-shadow: -10px 0 30px #000a; }
+  #logbtn { display: inline-flex; }
+  #preview { position: fixed; left: 16px; top: 50%; transform: translateY(-50%); z-index: 80; pointer-events: none; display: none; min-height: 0; padding: 0;
+             filter: drop-shadow(0 14px 18px #000c); animation: pvin .12s ease-out; }
+  #preview.on { display: flex; }
+  #preview .card { --s: var(--pv, 3); }
+  @keyframes pvin { from { opacity: 0; transform: translate(-10px, -50%); } }
+  @media (max-width: 999px) { #preview { display: none !important; } }
+  @media (min-width: 1700px) and (min-height: 561px) { #endturn { right: calc(50% - 760px); } }   /* จอกว้างมาก: ปุ่มจบเทิร์นไม่ไปไกลขอบ */
+  .topbtns { position: absolute; top: 8px; right: 10px; z-index: 30; display: flex; gap: 6px; }
+  .topbtns button { width: 44px; height: 40px; min-height: 0; padding: 0; font-size: 18px; justify-content: center; }
+  #board { padding: 6px 110px 0 110px; grid-template-rows: auto auto 1fr auto 1fr auto auto auto; }
+  /* พระเอก: ขนาดตามความสูงจอ (--hz) */
+  .hero { width: var(--hz, 92px); height: var(--hz, 92px); }
+  .hero .portrait { border-width: calc(var(--hz, 92px) * .13); border-image-width: calc(var(--hz, 92px) * .13); }
+  .hero .portrait img { width: calc(var(--hz, 92px) * .72); }
+  .hpgem { width: calc(var(--hz, 92px) * .44); height: calc(var(--hz, 92px) * .44); font-size: calc(var(--hz, 92px) * .16); right: calc(var(--hz, 92px) * -.16); bottom: calc(var(--hz, 92px) * -.06); }
+  .heroname { font-size: calc(var(--hz, 92px) * .14); top: calc(var(--hz, 92px) * -.13); }
+  .herorow { min-height: 0; }
+  .herorow .piles { background: #1b1630c8; box-shadow: 0 0 0 2px #0008; padding: 3px 12px; gap: 12px; border-radius: 3px; }
+  .herorow .piles.right { background: none; box-shadow: none; }
+  .herorow .piles .pile { font-size: calc(var(--hz, 92px) * .15); color: var(--fg); }
+  .herorow .piles .pile img { width: calc(var(--hz, 92px) * .19); height: auto; }
+  .herorow .piles .muted { font-size: calc(var(--hz, 92px) * .13); }
+  /* มือศัตรู: ตัวเลขติดพัด */
+  .opphand { height: calc(var(--hz, 92px) * .5); }
+  .opphand img { width: calc(var(--hz, 92px) * .37); height: auto; margin: 0 calc(var(--hz, 92px) * -.1); }
+  .opphand b { position: static; align-self: center; margin-left: calc(var(--hz, 92px) * .2); font-size: calc(var(--hz, 92px) * .13);
+               background: #1b1630d0; padding: 4px 6px; border-radius: 3px; }
+  /* แถบสนามแต่ละฝั่ง + เส้นกลาง */
+  .row.field { background: linear-gradient(90deg, transparent, #1b163055 15%, #1b163055 85%, transparent); border-radius: 50% / 12px; }
+  #efield { align-self: end; } #mfield { align-self: start; }   /* สนามสองฝั่งชิดเส้นกลาง */
+  .midline { position: relative; display: flex; justify-content: center; align-items: center; min-height: 26px; }
+  .midline::before { content: ""; position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: linear-gradient(90deg, transparent, #e0b04090 20%, #e0b04090 80%, transparent); }
+  .midline #msg { position: relative; background: #1b1630e8; padding: 3px 14px; box-shadow: 0 0 0 2px #e0b04080; min-height: 0; font-size: max(14px, calc(var(--hz, 92px) * .15)); max-width: 92%; }
+  .midline #msg:empty { display: none; }
   @media (max-width: 640px) {
     .menu { grid-template-columns: 1fr; }
     .mainmenu { grid-template-columns: 1fr; gap: 12px; } .deckhero { height: 100px; } .deckhero img { width: 84px; } button.big { min-height: 48px; font-size: 17px; }
@@ -384,11 +416,20 @@
     .row { gap: 4px; } .field { border-width: 8px; border-image-width: 8px; padding: 2px; }
     .bar { gap: 6px; font-size: 12px; } .hearts img { width: 16px; height: 13px; }
     #minfo { display: none; }
-    #board { padding: 4px 6px 0; } #endturn { width: 62px; height: 62px; font-size: 12px; right: 6px; top: auto; bottom: calc(96px * var(--hs) * .78 + 70px); transform: none; }
-    .hero { width: 70px; height: 70px; } .hero .portrait img { width: 46px; } .herorow { min-height: 70px; gap: 6px; } .hpgem { width: 32px; height: 32px; font-size: 12px; }
-    .opphand { height: 30px; } .opphand img { width: 24px; height: 36px; }
+    #board { padding: 4px 6px 0; } .topbtns { top: 4px; right: 4px; } .topbtns button { width: 36px; height: 34px; font-size: 15px; } #endturn { width: 62px; height: 62px; font-size: 12px; right: 6px; top: auto; bottom: calc(96px * var(--hs) * .78 + 70px); transform: none; }
+    .herorow { gap: 6px; } .herorow .piles { padding: 2px 6px; gap: 6px; }
     .pile img { width: 14px; height: 16px; }
     button { min-height: 32px; padding: 2px 8px; }
+  }
+  @media (max-height: 560px) {
+    #board { grid-template-rows: auto 1fr auto 1fr auto auto; padding: 2px 96px 0 calc(var(--hz) * 1.9); }
+    .herorow { position: absolute; left: 8px; display: flex; flex-direction: column-reverse; align-items: center; gap: 2px; z-index: 5; }
+    .herorow.opp { top: 4px; } .herorow.me { bottom: calc(96px * var(--hs) * .78 + 4px); flex-direction: column; }
+    .herorow .piles { padding: 1px 6px; gap: 6px; } .herorow .piles .muted, .herorow .piles.right { display: none; }
+    .opphand { height: 22px; } .opphand img { width: 18px; margin: 0 -5px; } .opphand b { font-size: 10px; padding: 2px 4px; }
+    .midline { min-height: 18px; } .midline #msg { font-size: 12px; padding: 1px 8px; }
+    #endturn { width: 64px; height: 64px; font-size: 12px; right: 8px; top: 50%; bottom: auto; transform: translateY(-50%); }
+    .topbtns button { width: 34px; height: 30px; font-size: 14px; }
   }
 </style>
 </head>
@@ -396,18 +437,19 @@
 <div id="app">
   <div id="board">
     <div class="opphand" id="ehand" title="การ์ดในมือศัตรู"></div>
-    <div class="herorow">
+    <div class="topbtns"><button id="logbtn" title="บันทึกเกม">📜</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button><button id="quitbtn" title="ออกจากเกม">⏏</button></div>
+    <div class="herorow opp">
       <div class="piles"><span class="pile" id="edeck"></span><span class="pile" id="egrave"></span><span class="muted" id="earch"></span></div>
       <div class="hero" id="eface"><div class="portrait"><img id="eheroimg" alt=""></div><div class="hpgem px-text" id="ehp"></div><div class="heroname px-text" id="ename"></div></div>
       <div class="piles right"></div>
     </div>
     <div class="row field" id="efield"></div>
-    <div id="msg" class="px-text"></div>
+    <div class="midline"><div id="msg" class="px-text"></div></div>
     <div class="row field" id="mfield"></div>
-    <div class="herorow">
+    <div class="herorow me">
       <div class="piles"><span class="pile" id="mdeck"></span><span class="pile" id="mgrave"></span><span class="muted" id="minfo"></span></div>
       <div class="hero" id="mface"><div class="portrait"><img id="mheroimg" alt=""></div><div class="hpgem px-text" id="mhp"></div><div class="heroname px-text" id="mname"></div></div>
-      <div class="piles right"><button id="quitbtn" title="ออกจากเกม">⏏ ออก</button><button id="logbtn">บันทึก</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button></div>
+      <div class="piles right"></div>
     </div>
     <div class="actionbar"><span id="abil"></span><span id="paybox"></span><button id="cancel" style="display:none">ยกเลิก</button></div>
     <div class="row hand" id="mhand"></div>
@@ -415,7 +457,8 @@
     <svg id="arrow" class="arrow-svg"><defs><marker id="ahead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#ff6070"/></marker></defs>
       <path id="arrowpath" d="" stroke="#ff6070" stroke-width="10" stroke-dasharray="14 8" fill="none" marker-end="url(#ahead)"/></svg>
   </div>
-  <div id="side" class="panel"><div id="preview"><span class="muted">ชี้การ์ดเพื่อดูขยาย</span></div><div id="log"></div></div>
+  <div id="side" class="panel"><h3 class="px-text" style="margin:4px 6px">บันทึกเกม</h3><div id="log"></div></div>
+  <div id="preview"></div>
 </div>
 
 <div id="title">
@@ -554,7 +597,7 @@ function showTip(el, v, o) {
   let y = Math.min(r.top, innerHeight - h - 4); if (x === r.left) y = r.top - h - 8 < 4 ? r.bottom + 8 : r.top - h - 8;
   tipEl.style.left = x + "px"; tipEl.style.top = Math.max(4, y) + "px";
 }
-function hideTip() { if (tipEl) { tipEl.remove(); tipEl = null; tipAnchor = null; } }
+function hideTip() { if (tipEl) { tipEl.remove(); tipEl = null; tipAnchor = null; } const p = document.getElementById("preview"); if (p) p.classList.remove("on"); }
 const RACECOL = { human: "#4a78c0", hell: "#b0303a", heaven: "#d8b450", spirit: "#3e9a6a", beast: "#c07a38", dino: "#6a9a3a", machine: "#7a8496", dragon: "#7a4ab0", fish: "#3a8ab8", neutral: "#8a7a6a" };
 const TOKART = { "ลูกหมานรก": "tok_hellpup", "ร่างแยก": "tok_clone", "เฟือง": "tok_gear", "โดรน": "tok_drone", "ต้นกล้า": "tok_sapling",
   "ลูกหมาป่า": "tok_wolfpup", "ตัวอ่อน": "tok_larva", "ปลาเล็ก": "tok_fish", "ลูกมังกร": "tok_whelp", "ไข่": "tok_egg",
@@ -570,16 +613,20 @@ const FAST = location.hash === "#auto" || location.hash === "#nethost" || locati
 
 // ---------------------------------------------------------------- ขนาดการ์ดตามจอ
 function layout() {
-  const side = innerWidth >= 1000 ? 310 : 0;
-  const W = innerWidth - side - 20 - 24 - 8, H = (window.visualViewport ? visualViewport.height : innerHeight) - 2 * 52 - 30 - 24 - 16 - 50;
+  const vw = innerWidth, vh = window.visualViewport ? visualViewport.height : innerHeight, short = vh < 560, narrow = vw < 640;
+  const r = (x) => (Math.floor(x * 20) / 20).toFixed(2), set = (k, v) => document.documentElement.style.setProperty(k, v);
+  // การ์ดเต็มใบ (หน้าต่าง mulligan / สอนเล่น) — คงสูตรเดิม
+  const W = vw - 20 - 24 - 8, H = vh - 2 * 52 - 30 - 24 - 16 - 50;
   const s = Math.max(0.8, Math.min(2.2, (W - 4 * 8) / (5 * 64), H / (3 * 96 + 8)));
-  const vh = window.visualViewport ? visualViewport.height : innerHeight;
-  const hs = Math.max(s, Math.min(2.3, (vh - 2 * (96 * s + 30) - 2 * 52 - 30 - 40) / 96));   // จอสูงแคบ: การ์ดในมือใหญ่กว่าบนสนาม
-  const r = (x) => (Math.floor(x * 20) / 20).toFixed(2);
-  document.documentElement.style.setProperty("--cs", r(s)); document.documentElement.style.setProperty("--hs", r(hs));
-  const W2 = innerWidth - side - (innerWidth < 640 ? 20 : 140), H2 = (window.visualViewport ? visualViewport.height : innerHeight) - 44 - 2 * 96 - 30 - 96 * hs * 0.78 - 40;
-  const ms = Math.max(0.9, Math.min(2.4, (W2 - 4 * 10) / (5 * 56), H2 / (2 * 50 + 40)));
-  document.documentElement.style.setProperty("--ms", r(ms));
+  set("--cs", r(s));
+  // พระเอก / มือ / มอน: แบ่งความสูงจอ
+  const hz = Math.round(short ? Math.max(46, vh * 0.13) : Math.max(64, Math.min(160, vh * 0.12)));
+  const hs = Math.max(1, Math.min(2.7, (short ? 0.24 : 0.2) * vh / (96 * 0.78), (vw - 20) / (64 * (narrow ? 3.1 : 6))));
+  const handH = 96 * hs * 0.78, oh = short ? 22 : hz * 0.5, heroRows = short ? 0 : 2 * hz + 20, mid = short ? 18 : 30;
+  const fieldH = (vh - oh - heroRows - mid - handH - 24) / 2;
+  const sidePad = narrow ? 20 : short ? hz * 1.9 + 100 : 240;
+  const ms = Math.max(0.85, Math.min(2.8, (fieldH - 22) / 50, (vw - sidePad - 4 * 10) / (5 * 56)));
+  set("--hz", hz + "px"); set("--hs", r(hs)); set("--ms", r(ms)); set("--pv", r(Math.max(2.2, Math.min(4, vh * 0.55 / 96))));
 }
 addEventListener("resize", () => { layout(); render(); });
 layout();
@@ -616,7 +663,8 @@ function cardEl(v, o = {}) {
   const big = () => cardEl(v, { powerNow: o.powerNow, costNow: o.costNow, status: o.status, pred: o.pred, unit: o.unit });
   el.addEventListener("pointerenter", (e) => {
     if (e.pointerType !== "mouse") return;
-    const p = $("preview"); p.innerHTML = ""; p.appendChild(big());
+    const p = $("preview"); p.innerHTML = "";
+    if (el.closest("#board") && !el.closest("#mhand") && !document.querySelector(".dragghost")) { p.appendChild(big()); p.classList.add("on"); }
     if (!el.closest(".zoom, .showcard")) showTip(el, v, o);
   });
   el.addEventListener("pointerleave", hideTip);
