@@ -90,6 +90,7 @@
   .opp-hand { display: inline-flex; gap: 2px; }
   .opp-hand i { width: 14px; height: 20px; background: url(img/ui_deck.png) center / 100% 100% no-repeat; }
   #paybox { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+  #abil { display: inline-flex; gap: 6px; flex-wrap: wrap; } #abil button { border-image-source: url(img/ui_btn_gold.png); font-size: 13px; }
   .opp-hand b { margin-left: 4px; font-family: "Press Start 2P"; font-size: 13px; color: #fff; }
 
   /* ---------- หน้าจัดเดค ---------- */
@@ -268,6 +269,7 @@
       <span class="muted" id="minfo"></span>
       <span class="grow"></span>
       <span class="pile" id="mdeck"></span><span class="pile" id="mgrave"></span>
+      <span id="abil"></span>
       <span id="paybox"></span>
       <button id="cancel" style="display:none">ยกเลิก</button>
       <button id="logbtn">บันทึก</button>
@@ -678,6 +680,13 @@ function render() {
     const el = cardEl(ROW[h.id], { costNow: h.costNow, cls });
     el.onclick = () => clickHand(h, k); hand.appendChild(el);
   });
+  // สกิลที่กดใช้เอง (ฟื้นคืน / รีไซเคิล)
+  $("abil").innerHTML = "";
+  if (V.myTurn && mode === "idle") for (const ab of V.me.abilities || []) {
+    if (ab.err) continue;
+    const b = document.createElement("button"); b.textContent = "✦ " + ab.label; b.title = "ใช้สกิล";
+    b.onclick = () => (ab.pay ? pickDiscard(ab) : act({ t: "ability", key: ab.key })); $("abil").appendChild(b);
+  }
   // ปุ่มและข้อความ
   $("endturn").disabled = !V.myTurn || mode !== "idle";
   $("cancel").style.display = mode === "pay" || mode === "attack" ? "" : "none";
@@ -748,6 +757,14 @@ function askModal(p) {
     m.querySelector("#noreact").onclick = () => { m.remove(); resolve(null); };
     document.body.appendChild(m);
   });
+}
+// เลือกการ์ดในมือที่จะทิ้งเป็นค่าใช้สกิล
+function pickDiscard(ab) {
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="box panel"><h2 class="px-text">${esc(ab.label)}</h2><p class="muted">เลือกการ์ดที่จะทิ้ง</p><div class="cards"></div><div class="btns"><button id="pdno">ยกเลิก</button></div></div>`;
+  V.me.hand.forEach((h, k) => { const el = cardEl(ROW[h.id], { cls: "click" }); el.onclick = () => { m.remove(); act({ t: "ability", key: ab.key, k }); }; m.querySelector(".cards").appendChild(el); });
+  m.querySelector("#pdno").onclick = () => m.remove();
+  document.body.appendChild(m);
 }
 function gameOver() {
   SFX.play(V.winner === "me" ? "win" : "lose");
@@ -1135,6 +1152,7 @@ function hints() {
   if (!V.myTurn) { if (V.opp.field.length && V.me.hp < 5) hint("hp", "เสีย HP เมื่อศัตรูตีผู้เล่นตอน<b>สนามเราว่าง</b> — วางมอนสเตอร์ไว้กันไว้เสมอ"); return; }
   if (mode === "pay") return hint("pay", "การ์ด<b>ขอบฟ้า</b>คือการ์ดที่จะทิ้งจ่าย gem (เกมเลือกตัวที่คุ้มสุดให้) · แตะเพื่อเลือก/ยกเลิก · gem พอแล้วกด <b>อัญเชิญ</b>");
   if (mode === "attack") return hint("aim", "เป้าที่ตีได้มี<b>ขอบแดง</b> พร้อมป้ายบอกผล เช่น “4 vs 3: ชนะ” · ถ้าสนามศัตรูว่าง ให้แตะ<b>หัวใจศัตรู</b>");
+  if ((V.me.abilities || []).some((a) => !a.err)) hint("abil", "มีปุ่ม <b>✦ สกิล</b> ขึ้นที่แถบล่าง — การ์ดบางใบมีสกิลที่กดใช้เองได้ เช่น ฟื้นคืนจากสุสาน");
   if (V.me.field.some((x) => !x.atkErr)) return hint("ready", "มอนสเตอร์ที่<b>เรืองเขียว</b>โจมตีได้ — แตะมัน แล้วเลือกเป้าหมาย");
   if (V.me.hand.some((h) => h.costNow == null && !h.err)) hint("spell", "แตะ<b>เวทปกติ</b>เพื่อใช้ได้เทิร์นละ 1 ใบ ไม่ต้องจ่าย cost");
   if (V.me.hand.some((h) => h.costNow != null && !h.err)) return hint("summon", "ตาคุณ! แตะ<b>มอนสเตอร์ในมือ</b>เพื่ออัญเชิญ — จ่าย cost ด้วยการทิ้งการ์ดอื่นให้ gem รวมพอ");

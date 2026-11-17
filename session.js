@@ -74,7 +74,8 @@
         seat: i, phase: this.phase, mullDone: this.mullDone[i], turn: G.turn, myTurn: my, busy: this.busy,
         whoseTurn: G.P[G.cur].name, winner: G.winner ? (G.winner === p ? "me" : "opp") : null,
         me: { name: p.name, arch: this.deckNames[i], hp: p.hp, deck: p.deck.length, grave: p.grave.map((c) => c.name), hand,
-              field: p.field.map((x) => unit(p, x, true)), spellUsed: p.spellUsed, spellMax: p.spellMax },
+              field: p.field.map((x) => unit(p, x, true)), spellUsed: p.spellUsed, spellMax: G.spellCap(p),
+              abilities: my ? G.abilities(p).map(({ key, label, pay, err }) => ({ key, label, pay, err })) : [] },
         opp: { name: e.name, arch: this.deckNames[1 - i], hp: e.hp, deck: e.deck.length, grave: e.grave.map((c) => c.name), handCount: e.hand.length,
                field: e.field.map((x) => unit(e, x, false)) },
       };
@@ -99,7 +100,9 @@
         if (a.t === "summon") {
           const c = p.hand[a.k], ks = [...new Set(a.f || [])];
           if (!c || ks.includes(a.k) || ks.some((k) => !p.hand[k])) err = "เลือกการ์ดไม่ถูกต้อง";
-          else err = G.summon(p, c, ks.map((k) => p.hand[k]));
+          else err = await G.summon(p, c, ks.map((k) => p.hand[k]), this.reactFn);
+        } else if (a.t === "ability") {
+          err = G.useAbility(p, String(a.key || ""), Number.isInteger(a.k) ? a.k : null);
         } else if (a.t === "cast") {
           const c = p.hand[a.k];
           err = c ? await G.cast(p, c, this.reactFn) : "เลือกการ์ดไม่ถูกต้อง";
@@ -136,8 +139,8 @@
       if (this.seats[i] === "bot") return this.G.botReact(d, info);
       this.push();
       const payload = {
-        head: info.spell ? `${a.name} ร่ายเวท ${info.spell.name}` : `${info.attacker.name} โจมตี ${info.targetIsPlayer ? "คุณ (ผู้เล่น)" : info.target.name}`,
-        sub: info.spell ? info.spell.ab : "เลือกเวทสวนเพื่อตอบโต้ หรือทิ้งมอนพรีกายจากมือรับแทน",
+        head: info.etb ? `${a.name} อัญเชิญ ${info.etb.name}` : info.spell ? `${a.name} ร่ายเวท ${info.spell.name}` : `${info.attacker.name} โจมตี ${info.targetIsPlayer ? "คุณ (ผู้เล่น)" : info.target.name}`,
+        sub: info.etb ? `ยกเลิกสกิลลงสนาม: ${info.etb.ab}` : info.spell ? info.spell.ab : "เลือกเวทสวนเพื่อตอบโต้ หรือทิ้งมอนพรีกายจากมือรับแทน",
         opts: info.opts.map((o) => ({ id: o.card.id, kind: o.kind })),
       };
       const k = await this.ask(i, payload);
