@@ -38,7 +38,7 @@
   .card > * { position: absolute; }
   .u { --x: 0; --y: 0; --w: 0; --h: 0; left: calc(var(--x) * 1px * var(--s)); top: calc(var(--y) * 1px * var(--s));
        width: calc(var(--w) * 1px * var(--s)); height: calc(var(--h) * 1px * var(--s)); }
-  .name { display: flex; align-items: center; justify-content: center; color: #2a1f1a; font-weight: 500; white-space: nowrap; overflow: hidden; line-height: 1; }
+  .name { display: flex; align-items: center; justify-content: flex-start; padding-left: calc(1.5px * var(--s)); color: #2a1f1a; font-weight: 500; white-space: nowrap; overflow: hidden; line-height: 1; }
   .badge { display: flex; align-items: center; justify-content: center; background-size: 100% 100%;
            font-family: "Press Start 2P", monospace; color: #fff; text-shadow: 0 2px 0 var(--ink), 2px 0 0 var(--ink), -2px 0 0 var(--ink), 0 -2px 0 var(--ink); }
   .badge.power { justify-content: flex-start; align-items: flex-start; padding: calc(7.9px * var(--s)) 0 0 calc(7px * var(--s)); }
@@ -46,10 +46,13 @@
   .badge.up { color: var(--ok); } .badge.down { color: #ff8a8a; }
   .art { display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
   .noart { color: #fff8; font-size: 12px; align-items: center; text-align: center; }
-  .type { display: flex; align-items: center; justify-content: center; color: #fff; white-space: nowrap; overflow: hidden; }
+  .type { display: flex; align-items: center; justify-content: flex-start; color: #fff; white-space: nowrap; overflow: hidden; }
   .text { color: #2a1f1a; line-height: 1.25; padding: 2px 4px; overflow: hidden; }
-  .text .spacer { float: right; width: 0; height: calc(9px * var(--s)); }
-  .text .dodge { float: right; clear: right; width: calc(10px * var(--s)); height: calc(8.5px * var(--s)); }
+  .text .spacer { float: right; width: 0; height: calc(var(--sh, 8px) * var(--s)); }
+  .text .dodge { float: right; clear: right; width: calc(var(--dw, 12px) * var(--s)); height: calc(var(--dh, 10px) * var(--s)); }   /* เว้นที่ให้ดาบ power มุมล่างขวา */
+  .text .lspacer { float: left; width: 0; height: calc(var(--lsh, 8px) * var(--s)); }
+  .text .ldodge { float: left; clear: left; width: calc(var(--ldw, 9px) * var(--s)); height: calc(var(--ldh, 8px) * var(--s)); }   /* เว้นที่ให้เหรียญ gem มุมล่างซ้าย */
+  .name > span, .type > span { margin: 0 auto; }   /* ชื่อยาวไม่ล้นซ้ายใต้เหรียญ cost (ล้นขวาแทน → fitCard ย่อให้พอดี) */
   .kw { font-weight: 500; color: #7a2a30; }
   .tag { right: calc(5px * var(--s)); top: calc(15px * var(--s)); font-size: 10px; padding: 0 4px; background: #1b1630cc; color: var(--hi); }
   .status { left: calc(4px * var(--s)); top: calc(15px * var(--s)); display: flex; gap: 2px; flex-wrap: wrap; max-width: 86%; }
@@ -828,9 +831,9 @@ function cardEl(v, o = {}) {
       ${st ? `<div class="status">${st}</div>` : ""}`;
   } else el.innerHTML = `
     <div ${u(4, 14, 56, 44)} class="u art${v.art ? "" : " noart"}">${v.art ? `<img src="img/${v.art}.png" alt="">` : esc(v.name)}</div>
-    <div ${u(14, 4, 46, 7)} class="u name">${esc(v.name)}</div>
-    <div ${u(7, 61, 50, 5)} class="u type">${esc(typeLine)}</div>
-    <div ${u(4, 69, 56, 20)} class="u text">${pw !== "" ? `<span class="spacer"></span><span class="dodge"></span>` : ""}<div>${abilityHtml(v.ability || "")}</div></div>
+    <div ${u(14, 4, 46, 7)} class="u name"><span>${esc(v.name)}</span></div>
+    <div ${u(7, 61, 50, 5)} class="u type"><span>${esc(typeLine)}</span></div>
+    <div ${u(4, 69, 56, 20)} class="u text">${v.gem !== "" && v.gem != null ? `<span class="lspacer"></span>` : ""}${pw !== "" ? `<span class="spacer"></span>` : ""}${v.gem !== "" && v.gem != null ? `<span class="ldodge"></span>` : ""}${pw !== "" ? `<span class="dodge"></span>` : ""}<div>${abilityHtml(v.ability || "")}</div></div>
     ${cost !== "" ? `<div ${u(0, 0, 15, 15, "background-image:url(img/badge_cost.png)")} class="u badge${ccls}">${cost}</div>` : ""}
     ${v.gem !== "" && v.gem != null ? `<div ${u(1, 82, 13, 13, "background-image:url(img/badge_gem.png)")} class="u badge gem">${v.gem}</div>` : ""}
     ${pw !== "" ? `<div ${u(46, 79, 17, 17, "background-image:url(img/badge_power.png)")} class="u badge power${pcls}${pw.length > 1 ? " two" : ""}">${pw}</div>` : ""}
