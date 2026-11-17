@@ -18,6 +18,15 @@
       this.deckNames = o.decks.map((d) => (typeof d === "string" ? d : d.arch || d.name || "เดคจัดเอง"));
       this.G = new E.Game(mk(o.decks[0]), mk(o.decks[1]), o.seed, (s) => this.onLog(s));
       this.G.P.forEach((p, i) => (p.name = o.names[i]));
+      // พระเอกของแต่ละฝั่ง (รูปกลางจอ): หัวหน้าที่ cost สูงสุดในเดค ไม่มีก็พลทหารของเผ่าที่มีมากสุด
+      const all = o.cards;
+      this.heroes = this.G.P.map((p) => {
+        const ids = Object.keys(p.decklist), cs = ids.map((id) => all.find((c) => c.id === id)).filter(Boolean);
+        const lead = cs.filter((c) => c.leader).sort((a, b) => b.cost - a.cost)[0]; if (lead) return lead.id;
+        const race = {}; for (const c of cs) if (c.type === "มอน") race[c.id.slice(0, 3)] = (race[c.id.slice(0, 3)] || 0) + 1;
+        const top = Object.entries(race).sort((a, b) => b[1] - a[1])[0];
+        return top ? `${top[0]}-GEN-01` : cs[0].id;
+      });
       this.fxq = []; this.G.onFx = (e) => this.fxq.push(e);
       this.phase = "mull"; this.mullDone = [false, false]; this.busy = false;
       this.reactFn = (d, info) => this.react(d, info);
@@ -73,10 +82,10 @@
       return {
         seat: i, phase: this.phase, mullDone: this.mullDone[i], turn: G.turn, myTurn: my, busy: this.busy,
         whoseTurn: G.P[G.cur].name, winner: G.winner ? (G.winner === p ? "me" : "opp") : null,
-        me: { name: p.name, arch: this.deckNames[i], hp: p.hp, deck: p.deck.length, grave: p.grave.map((c) => c.name), hand,
+        me: { name: p.name, hero: this.heroes[i], arch: this.deckNames[i], hp: p.hp, deck: p.deck.length, grave: p.grave.map((c) => c.name), hand,
               field: p.field.map((x) => unit(p, x, true)), spellUsed: p.spellUsed, spellMax: G.spellCap(p),
               abilities: my ? G.abilities(p).map(({ key, label, pay, err }) => ({ key, label, pay, err })) : [] },
-        opp: { name: e.name, arch: this.deckNames[1 - i], hp: e.hp, deck: e.deck.length, grave: e.grave.map((c) => c.name), handCount: e.hand.length,
+        opp: { name: e.name, hero: this.heroes[1 - i], arch: this.deckNames[1 - i], hp: e.hp, deck: e.deck.length, grave: e.grave.map((c) => c.name), handCount: e.hand.length,
                field: e.field.map((x) => unit(e, x, false)) },
       };
     }

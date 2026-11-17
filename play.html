@@ -254,6 +254,66 @@
   .hint b { color: #a8323c; } .hint .btns { margin-top: 4px; justify-content: flex-end; display: flex; gap: 8px; }
   @keyframes hintin { from { transform: translate(-50%, -14px); opacity: 0; } }
 
+  /* ================= โต๊ะเกม (2026-11-17) ================= */
+  #board { position: relative; display: grid; grid-template-rows: auto auto 1fr auto 1fr auto auto auto; gap: 4px; padding: 6px 110px 0 12px;
+           background: radial-gradient(ellipse 70% 55% at 50% 50%, #3a2c5ad0, #3a2c5a40 70%, transparent 72%); }
+  .opphand { height: 44px; display: flex; justify-content: center; align-items: flex-start; position: relative; }
+  .opphand img { width: 34px; height: 51px; margin: 0 -9px; transform-origin: 50% -150%; filter: drop-shadow(0 2px 2px #0008); }
+  .opphand b { position: absolute; right: calc(50% - 150px); top: 8px; font-family: "Press Start 2P"; font-size: 12px; }
+  .herorow { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; min-height: 92px; }
+  .herorow .piles { display: flex; gap: 10px; align-items: center; justify-self: end; flex-wrap: wrap; }
+  .herorow .piles.right { justify-self: start; }
+  .hero { position: relative; width: 92px; height: 92px; }
+  .hero .portrait { width: 100%; height: 100%; border: 12px solid transparent; border-image: url(img/ui_panel.png) 8 fill / 12px stretch;
+                    display: flex; align-items: flex-end; justify-content: center; overflow: hidden; background: #2a2244; }
+  .hero .portrait img { width: 64px; image-rendering: pixelated; animation: idle 2.6s ease-in-out infinite; transform-origin: 50% 100%; }
+  .hpgem { position: absolute; right: -14px; bottom: -6px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+           font-family: "Press Start 2P"; font-size: 15px; color: #fff; background: url(img/ui_heart.png) center / 100% 100% no-repeat; }
+  .heroname { position: absolute; left: 50%; top: -10px; transform: translateX(-50%); white-space: nowrap; font-size: 13px; font-weight: 600; background: #1b1630d0; padding: 0 6px; }
+  .hero.target { cursor: crosshair; filter: drop-shadow(0 0 8px var(--bad)) drop-shadow(0 0 2px var(--bad)); animation: aim .8s ease-in-out infinite; }
+  .hero.droptarget { filter: drop-shadow(0 0 12px #ff3040) drop-shadow(0 0 3px #ff3040); transform: scale(1.08); }
+  .row.field { min-height: calc(50px * var(--ms) + 26px); border: none; background: none; padding: 0; gap: calc(6px * var(--ms)); }
+  .row.field .slot { display: none; }
+  #msg { min-height: 22px; }
+  .actionbar { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 0; flex-wrap: wrap; }
+  .actionbar:empty { display: none; }
+  /* มอนบนสนาม: กรอบเล็ก (รูป + power + สถานะ) */
+  .card.minion { --s: var(--ms); width: calc(56px * var(--ms)); height: calc(50px * var(--ms)); background: none !important; filter: drop-shadow(0 4px 3px #000a); }
+  .card.minion .m-art { position: absolute; inset: 0 0 calc(6px * var(--ms)) 0; border-radius: calc(5px * var(--ms)); overflow: hidden;
+                        background-size: calc(64px * var(--ms)) calc(96px * var(--ms)); background-position: calc(-4px * var(--ms)) calc(-14px * var(--ms));
+                        box-shadow: 0 0 0 3px var(--rc, #8a7a6a), 0 0 0 5px #1b1630; }
+  .card.minion .m-art .art { position: absolute; inset: 0; width: auto; height: auto; }
+  /* power บนกรอบมอน: วงกลมเลขใหญ่ + ดาบเล็ก */
+  .card.minion .m-pow { position: absolute; right: calc(-5px * var(--ms)); bottom: calc(-3px * var(--ms)); width: calc(17px * var(--ms)); height: calc(17px * var(--ms));
+                        border-radius: 50%; background: #2a1f1a; box-shadow: 0 0 0 2px #e0b040, 0 0 0 4px #1b1630; display: flex; align-items: center; justify-content: center; }
+  .card.minion .m-pow img { position: absolute; left: -45%; top: -45%; width: 80%; opacity: .95; }
+  .card.minion .m-pow b { font-family: "Press Start 2P"; font-size: calc(6px * var(--ms)); color: #fff; text-shadow: 0 2px 0 #1b1630; }
+  .card.minion .m-pow.up b { color: var(--ok); } .card.minion .m-pow.down b { color: #ff8a8a; }
+  .card.minion .status { left: calc(-3px * var(--ms)); top: calc(-7px * var(--ms)); max-width: 120%; }
+  .card.minion.guard .m-art { box-shadow: 0 0 0 3px var(--rc), 0 0 0 7px #e0b040, 0 0 0 9px #1b1630; }
+  .card.minion.stealth .m-art { opacity: .55; box-shadow: 0 0 0 3px #ffffff60, 0 0 0 5px #1b1630; }
+  .card.minion.dshield .m-art::after { content: ""; position: absolute; inset: 0; background: radial-gradient(#ffe08a00 55%, #ffe08a90); animation: dshield 1.6s ease-in-out infinite; }
+  @keyframes dshield { 50% { opacity: .5; } }
+  .card.minion.sel { transform: translateY(-10px) scale(1.06); }
+  .card.minion.droptarget { transform: scale(1.1); filter: drop-shadow(0 0 12px #ff3040); }
+  /* มือแบบพัด */
+  .row.hand { position: relative; display: block; overflow: visible; height: calc(96px * var(--hs) * .78); min-height: 0; padding: 0; margin-top: 4px; }
+  .row.hand .card { position: absolute; bottom: calc(-96px * var(--hs) * .2); transform-origin: 50% 120%;
+                    transform: translateY(var(--dy, 0)) rotate(var(--rot, 0deg)); transition: transform .15s, filter .15s; }
+  .row.hand .card:hover, .row.hand .card.lift { transform: translateY(-38%) scale(1.22) rotate(0deg); z-index: 60; }
+  .row.hand .card.sel, .row.hand .card.fodder { transform: translateY(-22%) rotate(0deg); z-index: 55; }
+  .row.hand .card.dragging { opacity: .25; }
+  .dragghost { position: fixed; z-index: 70; pointer-events: none; transform: translate(-50%, -60%) rotate(-4deg) scale(1.05); filter: drop-shadow(0 12px 10px #000c); }
+  /* ปุ่มจบเทิร์น + เวลาเทิร์น */
+  #endturn { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 84px; height: 84px; border-radius: 50%; border: none; padding: 0;
+             background: conic-gradient(#ffd860 var(--left, 360deg), #3a2c5a 0) ; box-shadow: 0 0 0 4px #1b1630, 0 6px 0 #1b1630; font-size: 16px; }
+  #endturn span { display: flex; align-items: center; justify-content: center; position: absolute; inset: 6px; border-radius: 50%; background: #c88e2a; line-height: 1.1; }
+  #endturn:disabled span { background: #5a4a6a; }
+  #endturn.ready span { animation: endready 1s ease-in-out infinite; }
+  @keyframes endready { 50% { background: #e8b040; box-shadow: 0 0 16px #ffd860; } }
+  .arrow-svg { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 65; display: none; }
+  .arrow-svg.on { display: block; }
+
   /* ---------- จอแคบ / มือถือ ---------- */
   @media (max-width: 999px) {
     #app { grid-template-columns: 1fr; }
@@ -270,6 +330,9 @@
     .row { gap: 4px; } .field { border-width: 8px; border-image-width: 8px; padding: 2px; }
     .bar { gap: 6px; font-size: 12px; } .hearts img { width: 16px; height: 13px; }
     #minfo { display: none; }
+    #board { padding: 4px 6px 0; } #endturn { width: 62px; height: 62px; font-size: 12px; right: 6px; top: auto; bottom: calc(96px * var(--hs) * .78 + 70px); transform: none; }
+    .hero { width: 70px; height: 70px; } .hero .portrait img { width: 46px; } .herorow { min-height: 70px; gap: 6px; } .hpgem { width: 32px; height: 32px; font-size: 12px; }
+    .opphand { height: 30px; } .opphand img { width: 24px; height: 36px; }
     .pile img { width: 14px; height: 16px; }
     button { min-height: 32px; padding: 2px 8px; }
   }
@@ -278,28 +341,25 @@
 <body>
 <div id="app">
   <div id="board">
-    <div class="bar">
-      <span class="who px-text" id="ename"></span><span class="face" id="eface"><span class="hearts" id="ehp"></span></span>
-      <span class="opp-hand" id="ehand" title="การ์ดในมือศัตรู"></span>
-      <span class="grow"></span>
-      <span class="pile" id="edeck"></span><span class="pile" id="egrave"></span><span class="muted" id="earch"></span>
+    <div class="opphand" id="ehand" title="การ์ดในมือศัตรู"></div>
+    <div class="herorow">
+      <div class="piles"><span class="pile" id="edeck"></span><span class="pile" id="egrave"></span><span class="muted" id="earch"></span></div>
+      <div class="hero" id="eface"><div class="portrait"><img id="eheroimg" alt=""></div><div class="hpgem px-text" id="ehp"></div><div class="heroname px-text" id="ename"></div></div>
+      <div class="piles right"></div>
     </div>
     <div class="row field" id="efield"></div>
     <div id="msg" class="px-text"></div>
     <div class="row field" id="mfield"></div>
-    <div class="bar">
-      <span class="who px-text" id="mname"></span><span class="hearts" id="mhp"></span>
-      <span class="muted" id="minfo"></span>
-      <span class="grow"></span>
-      <span class="pile" id="mdeck"></span><span class="pile" id="mgrave"></span>
-      <span id="abil"></span>
-      <span id="paybox"></span>
-      <button id="cancel" style="display:none">ยกเลิก</button>
-      <button id="logbtn">บันทึก</button>
-      <button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button>
-      <button class="main" id="endturn">จบเทิร์น</button>
+    <div class="herorow">
+      <div class="piles"><span class="pile" id="mdeck"></span><span class="pile" id="mgrave"></span><span class="muted" id="minfo"></span></div>
+      <div class="hero" id="mface"><div class="portrait"><img id="mheroimg" alt=""></div><div class="hpgem px-text" id="mhp"></div><div class="heroname px-text" id="mname"></div></div>
+      <div class="piles right"><button id="logbtn">บันทึก</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button></div>
     </div>
+    <div class="actionbar"><span id="abil"></span><span id="paybox"></span><button id="cancel" style="display:none">ยกเลิก</button></div>
     <div class="row hand" id="mhand"></div>
+    <button class="main" id="endturn"><span>จบ<br>เทิร์น</span></button>
+    <svg id="arrow" class="arrow-svg"><defs><marker id="ahead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#ff6070"/></marker></defs>
+      <path id="arrowpath" d="" stroke="#ff6070" stroke-width="10" stroke-dasharray="14 8" fill="none" marker-end="url(#ahead)"/></svg>
   </div>
   <div id="side" class="panel"><div id="preview"><span class="muted">ชี้การ์ดเพื่อดูขยาย</span></div><div id="log"></div></div>
 </div>
@@ -434,6 +494,7 @@ function showTip(el, v, o) {
   tipEl.style.left = x + "px"; tipEl.style.top = Math.max(4, y) + "px";
 }
 function hideTip() { if (tipEl) { tipEl.remove(); tipEl = null; tipAnchor = null; } }
+const RACECOL = { human: "#4a78c0", hell: "#b0303a", heaven: "#d8b450", spirit: "#3e9a6a", beast: "#c07a38", dino: "#6a9a3a", machine: "#7a8496", dragon: "#7a4ab0", fish: "#3a8ab8", neutral: "#8a7a6a" };
 const TOKART = { "ลูกหมานรก": "tok_hellpup", "ร่างแยก": "tok_clone", "เฟือง": "tok_gear", "โดรน": "tok_drone", "ต้นกล้า": "tok_sapling",
   "ลูกหมาป่า": "tok_wolfpup", "ตัวอ่อน": "tok_larva", "ปลาเล็ก": "tok_fish", "ลูกมังกร": "tok_whelp", "ไข่": "tok_egg",
   "โอเมก้าบอท": "tok_omega", "ไททันเกียร์": "tok_titan", "หุ่นเฟือง": "tok_gearbot" };
@@ -455,6 +516,9 @@ function layout() {
   const hs = Math.max(s, Math.min(2.3, (vh - 2 * (96 * s + 30) - 2 * 52 - 30 - 40) / 96));   // จอสูงแคบ: การ์ดในมือใหญ่กว่าบนสนาม
   const r = (x) => (Math.floor(x * 20) / 20).toFixed(2);
   document.documentElement.style.setProperty("--cs", r(s)); document.documentElement.style.setProperty("--hs", r(hs));
+  const W2 = innerWidth - side - (innerWidth < 640 ? 20 : 140), H2 = (window.visualViewport ? visualViewport.height : innerHeight) - 44 - 2 * 96 - 30 - 96 * hs * 0.78 - 40;
+  const ms = Math.max(0.9, Math.min(2.4, (W2 - 4 * 10) / (5 * 56), H2 / (2 * 50 + 40)));
+  document.documentElement.style.setProperty("--ms", r(ms));
 }
 addEventListener("resize", () => { layout(); render(); });
 layout();
@@ -469,7 +533,12 @@ function cardEl(v, o = {}) {
   const pcls = o.powerNow != null && v.power !== "" ? (o.powerNow > +v.power ? " up" : o.powerNow < +v.power ? " down" : "") : "";
   const ccls = o.costNow != null && o.costNow < +v.cost ? " up" : "";
   const st = (o.status || []).map((s, i) => `<span${i === 0 && o.pred ? ' class="pred"' : ""}>${esc(s)}</span>`).join("");
-  el.innerHTML = `
+  if (o.minion) {
+    el.classList.add("minion"); el.style.backgroundImage = ""; el.style.setProperty("--rc", RACECOL[v.race] || "#8a7a6a");
+    el.innerHTML = `<div class="m-art" style="background-image:url(img/frame_${v.race}.png)"><div class="art${v.art ? "" : " noart"}">${v.art ? `<img src="img/${v.art}.png" alt="">` : esc(v.name)}</div></div>
+      ${pw !== "" ? `<div class="m-pow${pcls}"><img src="img/badge_power.png" alt=""><b>${pw}</b></div>` : ""}
+      ${st ? `<div class="status">${st}</div>` : ""}`;
+  } else el.innerHTML = `
     <div ${u(4, 14, 56, 44)} class="u art${v.art ? "" : " noart"}">${v.art ? `<img src="img/${v.art}.png" alt="">` : esc(v.name)}</div>
     <div ${u(14, 4, 46, 7)} class="u name">${esc(v.name)}</div>
     <div ${u(7, 61, 50, 5)} class="u type">${esc(typeLine)}</div>
@@ -507,7 +576,7 @@ function longPress(el, fn) {
 const IMGSIZE = {};                                                     // ขนาดรูปที่เคยโหลดแล้ว → ปรับขนาดได้ทันทีไม่ต้องรอโหลด
 function fitCard(el) {
   if (!el.isConnected) return;
-  const S = el.offsetWidth ? el.offsetWidth / 64 : parseFloat(getComputedStyle(el).getPropertyValue("--s")) || 2;   // วัดจากขนาดจริง (--s อาจเป็นสูตร)
+  const S = el.offsetWidth ? el.offsetWidth / (el.classList.contains("minion") ? 56 : 64) : parseFloat(getComputedStyle(el).getPropertyValue("--s")) || 2;   // วัดจากขนาดจริง (--s อาจเป็นสูตร)
   const img = el.querySelector(".art img");
   if (img && img.naturalWidth) IMGSIZE[img.getAttribute("src")] = [img.naturalWidth, img.naturalHeight];
   const dim = img && IMGSIZE[img.getAttribute("src")];
@@ -729,13 +798,16 @@ async function playFx(e, v) {
 // ---------------------------------------------------------------- วาดกระดาน
 function hearts(n) { let h = ""; for (let i = 0; i < Engine.HP; i++) h += `<img src="img/ui_heart${i < n ? "" : "_empty"}.png" alt="">`; return h; }
 // ท่าขยับของมอนบนสนาม (CSS): ตัวบินลอยตัว · แช่แข็งหยุดนิ่งสีฟ้า
-const unitAnim = (x) => ((x.kws || []).includes("บิน") ? " flyer" : "") + ((x.status || []).some((s) => s.startsWith("❄")) ? " frozen" : "");
+const unitAnim = (x) => { const k = x.kws || []; return (k.includes("บิน") ? " flyer" : "") + ((x.status || []).some((s) => s.startsWith("❄")) ? " frozen" : "") +
+  (k.includes("พรีกาย") ? " guard" : "") + (k.includes("ซ่อนตัว") ? " stealth" : "") + (k.includes("โล่แสง") ? " dshield" : ""); };
 function render() {
   if (!V) return;
   $("ename").textContent = V.opp.name; $("mname").textContent = V.me.name;
-  $("ehp").innerHTML = hearts(V.opp.hp); $("mhp").innerHTML = hearts(V.me.hp);
+  $("ehp").textContent = V.opp.hp; $("mhp").textContent = V.me.hp;
   $("ehp").title = `HP ${V.opp.hp}`; $("mhp").title = `HP ${V.me.hp}`;
-  $("ehand").innerHTML = "<i></i>".repeat(Math.min(V.opp.handCount, 8)) + `<b class="px-text">${V.opp.handCount}</b>`;
+  for (const [id, hero] of [["eheroimg", V.opp.hero], ["mheroimg", V.me.hero]]) { const r = ROW[hero]; if (r && r.art && !$(id).src.endsWith(`/${r.art}.png`)) $(id).src = `img/${r.art}.png`; }
+  { const n = V.opp.handCount, mid = (n - 1) / 2;                      // มือศัตรู: หลังการ์ดเรียงพัด
+    $("ehand").innerHTML = Array.from({ length: Math.min(n, 10) }, (_, k) => `<img src="img/ui_cardback.png" alt="" style="transform:rotate(${(mid - k) * 5}deg) translateY(${Math.abs(k - mid) * 2}px)">`).join("") + `<b class="px-text">${n}</b>`; }
   $("ehand").title = `การ์ดในมือ ${V.opp.name}: ${V.opp.handCount} ใบ`;
   for (const [side, d, g] of [[V.me, "mdeck", "mgrave"], [V.opp, "edeck", "egrave"]]) {
     $(d).innerHTML = `<img src="img/ui_deck.png" alt="">${side.deck}`; $(d).title = "เดค";
@@ -759,18 +831,19 @@ function render() {
   const ef = $("efield"); ef.innerHTML = "";
   for (const x of V.opp.field) {
     const hit = targets.includes(x.uid), st = hit ? [predOf(x), ...x.status] : x.status;
-    const el = cardEl(unitCard(x), { powerNow: x.power, status: st, pred: hit, cls: (hit ? "target" : "") + unitAnim(x), unit: x });
+    const el = cardEl(unitCard(x), { powerNow: x.power, status: st, pred: hit, cls: (hit ? "target" : "") + unitAnim(x), unit: x, minion: true });
     el.dataset.uid = x.uid;
     el.onclick = () => { if (!hit) return; if (group.length > 1) act({ t: "gang", uids: group.map((g) => g.uid), target: x.uid }); else act({ t: "attack", uid: sel, target: x.uid }); };
     ef.appendChild(el);
   }
   for (let i = V.opp.field.length; i < Engine.FIELD; i++) ef.insertAdjacentHTML("beforeend", `<div class="slot"></div>`);
-  $("eface").className = "face" + (targets.includes("face") ? " target" : "");
+  $("eface").className = "hero" + (targets.includes("face") ? " target" : "");
   // สนามเรา
   const mf = $("mfield"); mf.innerHTML = "";
   for (const x of V.me.field) {
     const cls = !V.myTurn ? "" : mode === "attack" && (x.uid === sel || gang.includes(x.uid)) ? "sel" : !x.atkErr ? "ready click" : "click";
-    const el = cardEl(unitCard(x), { powerNow: x.power, status: x.status, cls: cls + unitAnim(x), unit: x });
+    const el = cardEl(unitCard(x), { powerNow: x.power, status: x.status, cls: cls + unitAnim(x), unit: x, minion: true });
+    el.addEventListener("pointerdown", (ev) => startArrow(ev, x));
     el.dataset.uid = x.uid;
     el.onclick = () => clickUnit(x); mf.appendChild(el);
   }
@@ -786,8 +859,11 @@ function render() {
     else if (V.myTurn) cls = "click";
     if (h.dead) cls += " dead";
     const el = cardEl(ROW[h.id], { costNow: h.costNow, cls }); el.dataset.id = h.id;
-    el.onclick = () => clickHand(h, k); hand.appendChild(el);
+    el.onclick = () => { if (dragJustEnded) return; clickHand(h, k); };
+    el.addEventListener("pointerdown", (ev) => startDrag(ev, el, h, k));
+    hand.appendChild(el);
   });
+  fanHand();
   // สกิลที่กดใช้เอง (ฟื้นคืน / รีไซเคิล)
   $("abil").innerHTML = "";
   if (V.myTurn && mode === "idle") for (const ab of V.me.abilities || []) {
@@ -797,6 +873,8 @@ function render() {
   }
   // ปุ่มและข้อความ
   $("endturn").disabled = !V.myTurn || mode !== "idle";
+  $("endturn").classList.toggle("ready", V.myTurn && mode === "idle" && !V.me.hand.some((h) => !h.err && (h.costNow == null || h.costNow === 0 || h.auto.length)) && !V.me.field.some((x) => !x.atkErr));
+  turnTimer();
   $("cancel").style.display = mode === "pay" || mode === "attack" ? "" : "none";
   if (mode === "pay") {
     const need = V.me.hand[sel].costNow, have = [...fodder].reduce((s, k) => s + V.me.hand[k].gem, 0);
@@ -822,6 +900,72 @@ function render() {
   }
 }
 
+// มือเรียงเป็นพัด
+function fanHand() {
+  const hand = $("mhand"), cards = [...hand.children], n = cards.length; if (!n) return;
+  const W = hand.clientWidth, cw = cards[0].offsetWidth || 128, gap = n > 1 ? Math.min(cw * 0.8, (W - cw) / (n - 1)) : 0;
+  const total = cw + gap * (n - 1), x0 = (W - total) / 2, mid = (n - 1) / 2, spread = Math.min(5, 26 / Math.max(1, n));
+  cards.forEach((el, k) => { el.style.left = x0 + gap * k + "px"; el.style.setProperty("--rot", `${(k - mid) * spread}deg`); el.style.setProperty("--dy", `${Math.abs(k - mid) ** 2 * 2.2}px`); el.style.zIndex = 10 + k; });
+}
+addEventListener("resize", () => requestAnimationFrame(fanHand));
+// ลากการ์ดจากมือขึ้นสนาม (= แตะเล่น) · ขยับไม่ถึง 10px ถือว่าแตะ
+let dragJustEnded = false;
+function startDrag(ev, el, h, k) {
+  if (ev.button > 0 || !V || !V.myTurn || mode !== "idle") return;
+  const sx = ev.clientX, sy = ev.clientY; let ghost = null;
+  const move = (e) => {
+    if (!ghost && Math.hypot(e.clientX - sx, e.clientY - sy) < 10) return;
+    if (!ghost) { hideTip(); ghost = cardEl(ROW[h.id], { costNow: h.costNow }); ghost.classList.add("dragghost"); document.body.appendChild(ghost); el.classList.add("dragging"); }
+    ghost.style.left = e.clientX + "px"; ghost.style.top = e.clientY + "px";
+  };
+  const up = (e) => {
+    removeEventListener("pointermove", move); removeEventListener("pointerup", up);
+    if (!ghost) return;
+    ghost.remove(); el.classList.remove("dragging"); dragJustEnded = true; setTimeout(() => (dragJustEnded = false), 50);
+    if (e.clientY < $("mhand").getBoundingClientRect().top - 30) clickHand(h, k);     // ปล่อยเหนือมือ = เล่น
+  };
+  addEventListener("pointermove", move); addEventListener("pointerup", up);
+}
+// ลากลูกศรจากมอนของเราไปเป้าหมาย = โจมตี (มีกลุ่มรุมอยู่ก็รุมตี) · ขยับไม่ถึง 10px ถือว่าแตะ (เลือก/เพิ่มเข้ากลุ่ม)
+function startArrow(ev, x) {
+  if (ev.button > 0 || !V || !V.myTurn || (mode !== "idle" && mode !== "attack") || x.atkErr) return;
+  const src = ev.currentTarget, r0 = src.getBoundingClientRect(), [ox, oy] = [r0.left + r0.width / 2, r0.top + r0.height / 2];
+  const sx = ev.clientX, sy = ev.clientY; let on = false, over = null;
+  const svg = $("arrow"), path = $("arrowpath");
+  const pick = (e) => { svg.classList.remove("on"); const t = document.elementFromPoint(e.clientX, e.clientY); svg.classList.add("on"); return t && (t.closest("#efield .card[data-uid]") || t.closest("#eface")); };
+  const move = (e) => {
+    if (!on && Math.hypot(e.clientX - sx, e.clientY - sy) < 10) return;
+    if (!on) { on = true; hideTip(); if (mode !== "attack" || (sel !== x.uid && !gang.includes(x.uid))) { sel = x.uid; gang = []; mode = "attack"; render(); } svg.classList.add("on"); }
+    const mx = (ox + e.clientX) / 2, my = Math.min(oy, e.clientY) - 80;
+    path.setAttribute("d", `M${ox},${oy} Q${mx},${my} ${e.clientX},${e.clientY}`);
+    const t = pick(e); if (over && over !== t) over.classList.remove("droptarget"); over = t; if (t) t.classList.add("droptarget");
+  };
+  const up = (e) => {
+    removeEventListener("pointermove", move); removeEventListener("pointerup", up);
+    if (!on) return;
+    svg.classList.remove("on"); if (over) over.classList.remove("droptarget");
+    dragJustEnded = true; setTimeout(() => (dragJustEnded = false), 50);
+    const t = pick(e); svg.classList.remove("on"); if (!t) return;
+    if (t.id === "eface") return $("eface").onclick();
+    t.click();
+  };
+  addEventListener("pointermove", move); addEventListener("pointerup", up);
+}
+// เวลาเทิร์น (เฉพาะออนไลน์): 75 วิ หมดแล้วจบเทิร์นให้อัตโนมัติ
+const TURN_SEC = 75; let turnKey = null, turnStart = 0, turnTick = 0;
+function turnTimer() {
+  const online = role === "host" || role === "guest";
+  const key = V && V.phase === "play" ? `${V.turn}:${V.whoseTurn}` : null;
+  if (key !== turnKey) { turnKey = key; turnStart = Date.now(); }
+  clearInterval(turnTick);
+  if (!online || !key) { $("endturn").style.setProperty("--left", "360deg"); return; }
+  const tick = () => {
+    const left = Math.max(0, TURN_SEC - (Date.now() - turnStart) / 1000);
+    $("endturn").style.setProperty("--left", `${(left / TURN_SEC) * 360}deg`);
+    if (left <= 0 && V.myTurn) { clearInterval(turnTick); mode = "idle"; sel = null; gang = []; act({ t: "end" }); }
+  };
+  tick(); turnTick = setInterval(tick, 500);
+}
 function clickHand(h, k) {
   SFX.play("click");
   if (mode === "mull") { fodder.has(k) ? fodder.delete(k) : fodder.add(k); return render(); }
@@ -1319,9 +1463,9 @@ const TUT = [
      <tr><td>พิษ</td><td>ตัวที่สู้ด้วยตายเสมอ</td></tr><tr><td>เกราะ N</td><td>บวก power ตอนถูกโจมตี</td></tr><tr><td>โล่แสง</td><td>กันตาย 1 ครั้ง</td></tr>
      <tr><td>บดขยี้</td><td>ฆ่าตัวสุดท้ายของศัตรูได้ → ศัตรูเสีย 1 HP ด้วย</td></tr><tr><td>เติบโต</td><td>ต้นเทิร์นเรา power +1</td></tr>
      <tr><td>ลงสนาม: / เมื่อตาย: / ทิ้ง:</td><td>สกิลที่ทำงานตอนลงสนาม / ตาย / ถูกทิ้งเป็นค่าอัญเชิญ</td></tr></table>`, pic: () => [] },
-  { h: "กดเล่นบนหน้าจอ", t: `1. <b>อัญเชิญ:</b> แตะมอนในมือ → เกมเลือกการ์ดที่จะทิ้งให้ (ขอบฟ้า) เปลี่ยนได้ → กด <b>อัญเชิญ</b><br>
-     2. <b>โจมตี:</b> แตะมอนที่<b style="color:var(--ok)">เรืองเขียว</b> → แตะเป้าที่<b style="color:var(--bad)">ขอบแดง</b> (หรือหัวใจศัตรูถ้าสนามว่าง)<br>
-     3. <b>เวทปกติ:</b> แตะที่การ์ด<br>4. เสร็จแล้วกด <b>จบเทิร์น</b><br>บันทึกเกมอยู่ด้านขวา (มือถือ: ปุ่ม “บันทึก”)`,
+  { h: "กดเล่นบนหน้าจอ", t: `1. <b>อัญเชิญ:</b> แตะหรือ<b>ลาก</b>มอนในมือขึ้นสนาม → เกมเลือกการ์ดที่จะทิ้งให้ (ขอบฟ้า) เปลี่ยนได้ → กด <b>อัญเชิญ</b><br>
+     2. <b>โจมตี:</b> แตะมอนที่<b style="color:var(--ok)">เรืองเขียว</b> → แตะเป้าที่<b style="color:var(--bad)">ขอบแดง</b> (หรือรูปพระเอกศัตรูถ้าสนามว่าง) — <b>ลากลูกศร</b>จากมอนไปเป้าก็ได้<br>
+     3. <b>เวทปกติ:</b> แตะหรือลากการ์ดขึ้นสนาม<br>4. เสร็จแล้วกดปุ่มกลม <b>จบเทิร์น</b> ด้านขวา (เล่นออนไลน์มีเวลาเทิร์น 75 วินาที)<br>บันทึกเกมอยู่ด้านขวา (มือถือ: ปุ่ม “บันทึก”)`,
     pic: () => [TC("DIN-HUN-05", { cls: "ready" })] },
   { h: "จัดเดค · เล่นกับเพื่อน", t: `• เดค 50 ใบ · ชื่อเดียวกันไม่เกิน 4 ใบ · การ์ด <b>Only One</b> ได้ 1 ใบ<br>• ปุ่ม <b>จัดเดค</b> ข้างช่องเลือกเดค — หรือใช้เดคอัตโนมัติตามสายก็ได้<br>
      • <b>สร้างห้อง</b> แล้วส่งรหัส 5 ตัวให้เพื่อน → เพื่อนกด <b>เข้าห้อง</b><br><br>พร้อมแล้ว ลองฝึกเล่นกับบอท — เกมจะเด้งคำแนะนำให้ตอนเจอสถานการณ์ใหม่`,
@@ -1361,12 +1505,12 @@ function hints() {
   if (mode === "pay") return hint("pay", "การ์ด<b>ขอบฟ้า</b>คือการ์ดที่จะทิ้งจ่าย gem (เกมเลือกตัวที่คุ้มสุดให้) · แตะเพื่อเลือก/ยกเลิก · gem พอแล้วกด <b>อัญเชิญ</b>");
   if (mode === "attack" && V.opp.field.some((x) => V.me.field.filter((y) => !y.atkErr).every((y) => y.power < x.power + (x.armor || 0))) && V.me.field.filter((y) => !y.atkErr).length > 1)
     return hint("gang", "ศัตรูตัวใหญ่เกินจะตีเดี่ยว? แตะ<b>มอนเรืองเขียวตัวอื่นเพิ่ม</b>เพื่อ<b>รุมตีรวม power</b> — ชนะแล้วเป้าจะฆ่ากลับ 1 ตัว");
-  if (mode === "attack") return hint("aim", "เป้าที่ตีได้มี<b>ขอบแดง</b> พร้อมป้ายบอกผล เช่น “4 vs 3: ชนะ” · ถ้าสนามศัตรูว่าง ให้แตะ<b>หัวใจศัตรู</b>");
+  if (mode === "attack") return hint("aim", "เป้าที่ตีได้มี<b>ขอบแดง</b> พร้อมป้ายบอกผล เช่น “4 vs 3: ชนะ” · ถ้าสนามศัตรูว่าง ให้แตะ/ลากไปที่<b>รูปพระเอกศัตรู</b>");
   if ((V.me.abilities || []).some((a) => !a.err)) hint("abil", "มีปุ่ม <b>✦ สกิล</b> ขึ้นที่แถบล่าง — การ์ดบางใบมีสกิลที่กดใช้เองได้ เช่น ฟื้นคืนจากสุสาน");
   if (V.me.field.some((x) => !x.atkErr)) return hint("ready", "มอนสเตอร์ที่<b>เรืองเขียว</b>โจมตีได้ — แตะมัน แล้วเลือกเป้าหมาย");
   if (V.me.hand.some((h) => h.costNow == null && !h.err)) hint("spell", "แตะ<b>เวทปกติ</b>เพื่อใช้ได้เทิร์นละ 1 ใบ ไม่ต้องจ่าย cost");
   if (V.me.hand.some((h) => h.costNow != null && !h.err)) return hint("summon", "ตาคุณ! แตะ<b>มอนสเตอร์ในมือ</b>เพื่ออัญเชิญ — จ่าย cost ด้วยการทิ้งการ์ดอื่นให้ gem รวมพอ");
-  if (V.turn > 2) hint("end", "ทำทุกอย่างที่อยากทำแล้ว กด <b>จบเทิร์น</b> (ขวาล่าง)");
+  if (V.turn > 2) hint("end", "ทำทุกอย่างที่อยากทำแล้ว กดปุ่มกลม <b>จบเทิร์น</b> ด้านขวา (เรืองเมื่อไม่มีอะไรให้ทำแล้ว)");
 }
 $("practice").onclick = () => {
   HINTS = true; hintSeen.clear(); role = "bot"; remember();
@@ -1398,6 +1542,26 @@ if (location.hash === "#gangtest") {                                            
     for (const p of [3, 4]) { const u = new Engine.Unit(CARD["HUM-GEN-01"]); u.power = p; u.attacksLeft = 1; A.field.push(u); }
     const big = new Engine.Unit(CARD["HUM-KNI-10"]); B.field.push(big); S.push();
     setTimeout(() => { clickUnit(V.me.field[0]); clickUnit(V.me.field[1]); }, 400); }, 2500);
+}
+if (location.hash === "#dragtest") {                                                  // ทดสอบลาก: ลากมอนไปตีศัตรู + ลากการ์ดขึ้นสนาม
+  $("go").click(); S.act(0, { t: "mull", idx: [] });
+  setTimeout(() => {
+    const [A, B] = S.G.P; S.G.cur = 0; S.G.turn = 3; S.botDelay = 1e9; A.field.length = B.field.length = 0;
+    const u = new Engine.Unit(CARD["HUM-KNI-10"]); u.attacksLeft = 1; A.field.push(u); B.field.push(new Engine.Unit(CARD["HUM-GEN-01"]));
+    A.hand = [CARD["NEU-SPL-16"], CARD["HUM-GEN-01"]]; S.push();
+    setTimeout(() => {
+      const fire = (type, el, x, y) => (el || window).dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, pointerType: "mouse", button: 0 }));
+      const mine = document.querySelector("#mfield .card"), foe = document.querySelector("#efield .card");
+      const a = mine.getBoundingClientRect(), b = foe.getBoundingClientRect();
+      fire("pointerdown", mine, a.x + 20, a.y + 20); fire("pointermove", null, a.x + 40, a.y - 10); fire("pointermove", null, b.x + b.width / 2, b.y + b.height / 2); fire("pointerup", null, b.x + b.width / 2, b.y + b.height / 2);
+      setTimeout(() => {
+        console.log("DRAG attack -> enemy field " + S.G.P[1].field.length);
+        const card = document.querySelector('#mhand .card[data-id="NEU-SPL-16"]'), c = card.getBoundingClientRect();
+        fire("pointerdown", card, c.x + 30, c.y + 30); fire("pointermove", null, c.x + 30, c.y - 40); fire("pointermove", null, c.x + 30, c.y - 300); fire("pointerup", null, c.x + 30, c.y - 300);
+        setTimeout(() => console.log("DRAG cast -> spellUsed " + S.G.P[0].spellUsed + " hand " + S.G.P[0].hand.length), 1500);
+      }, 1500);
+    }, 600);
+  }, 2500);
 }
 if (location.hash === "#practice") { $("practice").click(); }
 if (location.hash === "#builder") { openBuilder(); $("dfill").click(); document.querySelector("#fillok").click(); }   // ทดสอบหน้าจัดเดค
