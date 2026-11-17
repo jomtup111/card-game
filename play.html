@@ -731,7 +731,7 @@
     <div id="dlist"></div>
     <div class="btns">
       <button class="main" id="dsave">บันทึก</button><button id="dnew">เดคใหม่</button>
-      <button id="dfill">เริ่มจากสาย…</button><button id="dcode">คัดลอกรหัส</button>
+      <button id="dfill">เริ่มจากสาย…</button><button id="dcode">📤 แชร์เดค</button>
       <button id="dimport">นำเข้ารหัส</button><button id="ddelete">ลบเดคนี้</button>
     </div>
   </div>
@@ -2021,6 +2021,30 @@ function guestLost() {
 }
 $("host").onclick = () => { if (!peer) { peer = "starting"; hostRoom(); } };
 $("join").onclick = () => { if (!peer) { peer = "starting"; joinRoom($("joincode").value); } };
+// เปิดด้วยลิงก์เดค (?deck=): โชว์ตัวอย่างเดค + ปุ่มบันทึก (ไม่ทับเดคเดิม) แล้วลบพารามิเตอร์ออกจาก URL
+(function () {
+  const q = new URLSearchParams(location.search), code = q.get("deck"); if (!code) return;
+  const name = (q.get("n") || "เดคจากเพื่อน").slice(0, 24); q.delete("deck"); q.delete("n");
+  try { history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash); } catch {}
+  const ids = Engine.parseAnyDeckCode(code, ALL), err = !ids ? "ลิงก์เดคนี้ใช้ไม่ได้ (อาจเป็นการ์ดเวอร์ชันเก่า)" : ids.some((id) => !CARD[id]) ? "มีการ์ดที่ไม่รู้จัก" : Engine.validateDeck(ALL, ids);
+  const m = document.createElement("div"); m.className = "modal";
+  if (err && !ids) { m.innerHTML = `<div class="box panel"><h2 class="px-text">เปิดเดคไม่ได้</h2><p>${esc(err)}</p><div class="btns"><button id="dpx">ปิด</button></div></div>`; }
+  else {
+    const mons = [...new Set(ids)].map((id) => ROW[id]).filter((r) => r && r.type === "มอน" && r.art).sort((a, b) => (b.leader ? 1 : 0) - (a.leader ? 1 : 0) || +b.cost - +a.cost).slice(0, 8);
+    const races = [...new Set(ids.map((id) => ROW[id] && ROW[id].raceTh).filter(Boolean))].join(" · ");
+    m.innerHTML = `<div class="box panel" style="max-width:460px"><h2 class="px-text">เพื่อนส่งเดคมา</h2><p><b>${esc(name)}</b> · ${ids.length} ใบ · ${esc(races)}</p>
+      <div class="heropick" style="pointer-events:none">${mons.map((r) => `<button><img src="img/${r.art}.png" alt="">${esc(r.name.split(" ")[0])}</button>`).join("")}</div>
+      ${err ? `<p class="err">${esc(err)}</p>` : ""}<div class="btns"><button class="main" id="dpsave">บันทึกเดค</button><button id="dpx">ไม่เอา</button></div></div>`;
+  }
+  document.body.appendChild(m);
+  m.querySelector("#dpx").onclick = () => m.remove();
+  const sv = m.querySelector("#dpsave"); if (sv) sv.onclick = () => {
+    const decks = loadDecks(); let nm = name; while (decks.some((d) => d.name === nm)) nm += " ใหม่";
+    decks.push({ name: nm, ids }); saveDecks(decks); refreshDeckSelects(); $("mydeck").value = "d:" + (decks.length - 1); showDeckHero();
+    m.querySelector(".box").innerHTML = `<h2 class="px-text">บันทึกแล้ว ✓</h2><p>เดค "${esc(nm)}" อยู่ในเดคของฉันแล้ว</p><div class="btns"><button class="main" id="dpx2">ตกลง</button></div>`;
+    m.querySelector("#dpx2").onclick = () => m.remove();
+  };
+})();
 const roomParam = new URLSearchParams(location.search).get("room");
 if (roomParam) { $("joincode").value = roomParam.toUpperCase(); $("pfriend").hidden = false; netmsg("ใส่ชื่อ เลือกเดค แล้วกด <b>เข้าห้อง</b>"); }
 (() => {                                                              // เคยอยู่ในห้องในแท็บนี้: เสนอกลับเข้าห้องเดิม
@@ -2183,15 +2207,28 @@ $("dfill").onclick = () => {
   m.querySelector("#fillno").onclick = () => m.remove();
   document.body.appendChild(m);
 };
-$("dcode").onclick = async () => {
+// แชร์เดค: ลิงก์ (?deck=รหัสสั้น&n=ชื่อ) + คัดลอก / แชร์ / LINE / QR · เพื่อนกดลิงก์ = เห็นตัวอย่างเดคแล้วกดบันทึก
+const deckLink = (ids, name) => location.origin + location.pathname.replace(/play\.html$/, "") + "?deck=" + Engine.deckCodeShort(ids, ALL) + (name ? "&n=" + encodeURIComponent(name.slice(0, 24)) : "");
+$("dcode").onclick = () => {
   if (!B.ids.length) return bmsg("เดคยังว่าง", true);
-  const code = Engine.deckCode(B.ids);
-  try { await navigator.clipboard.writeText(code); bmsg("คัดลอกรหัสเดคแล้ว ส่งให้เพื่อนกด \"นำเข้ารหัส\""); }
-  catch { prompt("คัดลอกรหัสเดคนี้", code); }
+  const name = ($("dname").value || B.name || "เดคของฉัน").trim(), link = deckLink(B.ids, name), code = Engine.deckCodeShort(B.ids, ALL);
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="box panel" style="max-width:440px"><h2 class="px-text">แชร์เดค "${esc(name)}"</h2>
+    <p class="muted">ส่งลิงก์ให้เพื่อน กดแล้วเห็นเดคนี้ กดบันทึกได้เลย · หรือให้สแกน QR</p>
+    <div class="sharebtns"><button id="dsl">📋 คัดลอกลิงก์</button>${navigator.share ? `<button id="dss">📤 แชร์</button>` : ""}<a class="btnlike line" target="_blank" rel="noopener" href="https://line.me/R/msg/text/?${encodeURIComponent("เดค Battle of Banmo: " + name + " " + link)}">LINE</a><button id="dsc">คัดลอกรหัส</button></div>
+    <div class="qr" id="dsqr" style="margin:12px auto;width:max-content"></div><div class="muted" id="dsmsg"></div><div class="btns"><button id="dsx">ปิด</button></div></div>`;
+  document.body.appendChild(m);
+  const msg = (t) => (m.querySelector("#dsmsg").textContent = t);
+  m.querySelector("#dsx").onclick = () => m.remove();
+  m.querySelector("#dsl").onclick = async () => { try { await navigator.clipboard.writeText(link); msg("คัดลอกลิงก์แล้ว ✓"); } catch { prompt("คัดลอกลิงก์นี้", link); } };
+  m.querySelector("#dsc").onclick = async () => { try { await navigator.clipboard.writeText(code); msg("คัดลอกรหัสแล้ว ✓ (เพื่อนกด \"นำเข้ารหัส\")"); } catch { prompt("คัดลอกรหัสนี้", code); } };
+  const ss = m.querySelector("#dss"); if (ss) ss.onclick = () => navigator.share({ title: "เดค " + name, url: link }).catch(() => {});
+  const draw = () => { const q = m.querySelector("#dsqr"); if (!q || !window.QRCode) return; q.innerHTML = ""; new QRCode(q, { text: link, width: 168, height: 168, colorDark: "#1b1630", colorLight: "#fff6e0", correctLevel: QRCode.CorrectLevel.L }); };
+  if (window.QRCode) draw(); else { const sc = document.createElement("script"); sc.src = QRLIB; sc.onload = draw; sc.onerror = () => m.querySelector("#dsqr").remove(); document.head.appendChild(sc); }
 };
 $("dimport").onclick = () => {
   const code = prompt("วางรหัสเดค"); if (!code) return;
-  const ids = Engine.parseDeckCode(code);
+  const ids = Engine.parseAnyDeckCode(code, ALL);
   if (!ids || ids.some((id) => !CARD[id])) return bmsg("รหัสเดคไม่ถูกต้อง", true);
   Object.assign(B, { ids, idx: null, name: "เดคนำเข้า" }); $("dname").value = B.name; fillSaved(); renderDeck(); renderGrid(false);
   const err = Engine.validateDeck(ALL, ids); bmsg(err ? `นำเข้าแล้ว แต่: ${err}` : "นำเข้าแล้ว กดบันทึกเพื่อเก็บไว้", !!err);

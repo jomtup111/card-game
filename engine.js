@@ -1387,6 +1387,23 @@
     } catch { return null; }
   }
 
-  const api = { Card, Unit, Game, buildDeck, archetypes, validateDeck, deckCode, parseDeckCode, DECK, HP, FIELD };
+  // รหัสเดคแบบสั้น (ลิงก์/QR): "2" + แท็กชุดการ์ด 4 ตัว + ต่อการ์ดแต่ละแบบ: ลำดับในรายชื่อการ์ด (base36 2 ตัว) + จำนวน
+  // ใช้ได้เมื่อชุดการ์ดตรงกัน (แท็กไม่ตรง = เวอร์ชันการ์ดเปลี่ยน → คืน null) · รหัสแบบเดิม (base64) ยังอ่านได้ด้วย parseDeckCode
+  const cardList = (cards) => cards.map((c) => c.id).sort();
+  const listTag = (list) => { let h = 7; for (const ch of list.join(",")) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return (h % 1679616).toString(36).padStart(4, "0"); };
+  function deckCodeShort(ids, cards) {
+    const list = cardList(cards), n = {}; for (const id of ids) n[id] = (n[id] || 0) + 1;
+    return "2" + listTag(list) + Object.entries(n).map(([id, k]) => list.indexOf(id).toString(36).padStart(2, "0") + k).join("");
+  }
+  function parseAnyDeckCode(code, cards) {
+    code = String(code || "").trim();
+    if (code[0] !== "2" || code.length < 5) return parseDeckCode(code);
+    const list = cardList(cards); if (code.slice(1, 5) !== listTag(list)) return null;
+    const body = code.slice(5), ids = []; if (body.length % 3) return null;
+    for (let i = 0; i < body.length; i += 3) { const id = list[parseInt(body.slice(i, i + 2), 36)], k = +body[i + 2]; if (!id || !(k > 0)) return null; for (let j = 0; j < k; j++) ids.push(id); }
+    return ids;
+  }
+
+  const api = { Card, Unit, Game, buildDeck, archetypes, validateDeck, deckCode, parseDeckCode, deckCodeShort, parseAnyDeckCode, DECK, HP, FIELD };
   if (typeof module !== "undefined") module.exports = api; else root.Engine = api;
 })(typeof window !== "undefined" ? window : globalThis);
