@@ -276,6 +276,10 @@
   .subpanel label select, .subpanel label input { flex: 1; min-width: 0; }
   .subpanel .btns { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
   .subpanel .btns .big { flex: 1; }
+  .lvrow { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; } .lvrow > span:first-child { min-width: 64px; }
+  .lvrow .seg { display: flex; gap: 6px; flex: 1; } .lvrow .seg button { flex: 1; min-height: 40px; }
+  .lvrow .seg button.on { border-image-source: url(img/ui_btn_gold.png); color: #1b1630; }
+  .lvdesc { font-size: 12.5px; min-height: 18px; margin-bottom: 4px; }
   .friendgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .friendgrid p { margin: 0 0 6px; }
   .friendgrid .big { width: 100%; }
@@ -631,6 +635,8 @@
   <div class="subpanel panel" id="pbot" hidden>
     <h3>เล่นกับบอท</h3>
     <label><span>เดคบอท</span><select id="botdeck"></select></label>
+    <div class="lvrow"><span>ความยาก</span><span class="seg" id="botlv"><button data-v="easy">ง่าย</button><button data-v="normal">ปกติ</button><button data-v="hard">ยาก</button></span></div>
+    <div class="muted lvdesc" id="botlvdesc"></div>
     <div class="btns"><button class="main big" id="go">เริ่มเล่น</button><button data-close>ปิด</button></div>
   </div>
   <div class="subpanel panel" id="pfriend" hidden>
@@ -761,7 +767,7 @@ const MASCOTS = ["hum_hans", "hel_grib", "hea_luz", "spi_mushy", "bea_nutty", "d
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const u = (x, y, w, h, extra = "") => `style="--x:${x};--y:${y};--w:${w};--h:${h};${extra}"`;
-const SET = (() => { let o = {}; try { o = JSON.parse(localStorage.getItem("settings") || "{}"); } catch {} return Object.assign({ vol: 70, music: 40, speed: 1, hints: false, tips: true }, o); })();
+const SET = (() => { let o = {}; try { o = JSON.parse(localStorage.getItem("settings") || "{}"); } catch {} return Object.assign({ vol: 70, music: 40, speed: 1, hints: false, tips: true, botLevel: "normal" }, o); })();
 const BOTDELAY = 600;
 const saveSet = () => { try { localStorage.setItem("settings", JSON.stringify(SET)); } catch {} };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms * SET.speed));
@@ -1501,6 +1507,7 @@ function newSession(seats, names, decks, opts = {}) {
     // ถามเพื่อน (เวทสวน): เก็บคำถามไว้ ส่งซ้ำได้ถ้าเพื่อนหลุดแล้วกลับมา
     ask: (i, p) => (i === 0 ? askModal(p) : new Promise((res) => { pendingAsk = res; NET.askP = p; if (conn && conn.open) conn.send({ type: "ask", p }); })),
     ...opts });
+  if (opts.botLevel) S.G.P.forEach((p, i) => { if (seats[i] === "bot") { p.level = opts.botLevel; if (opts.botLevel === "hard") p.bonusDraw = 2; } });   // ระดับบอท
   S.start();
 }
 const myName = () => $("myname").value.trim() || (role === "guest" ? "ผู้เล่น 2" : role === "host" ? "ผู้เล่น 1" : "คุณ");
@@ -1531,6 +1538,12 @@ $("myname").value = store.get("name") || "";
 if (store.get("deck") && [...$("mydeck").options].some((o) => o.value === store.get("deck"))) $("mydeck").value = store.get("deck");
 const remember = () => { store.set("name", $("myname").value.trim()); store.set("deck", $("mydeck").value); };
 setTimeout(() => showDeckHero(), 0);
+// ระดับบอท
+const LVDESC = { easy: "บอทเล่นพลาดบ้าง ไม่ใช้เวทสวน ไม่รุมตี — เหมาะกับคนเพิ่งเล่น", normal: "บอทมาตรฐาน",
+  hard: "บอทเลือกคู่ตีฉลาดขึ้น ใช้เวทสวนเฉพาะที่ได้ผล และจั่วเพิ่ม 1 ใบทุก 2 เทิร์นของมัน" };
+function showLv() { for (const b of document.querySelectorAll("#botlv button")) b.classList.toggle("on", b.dataset.v === SET.botLevel); $("botlvdesc").textContent = LVDESC[SET.botLevel] || ""; }
+for (const b of document.querySelectorAll("#botlv button")) b.onclick = () => { SET.botLevel = b.dataset.v; saveSet(); showLv(); SFX.play("click"); };
+showLv();
 // หน้าแรก: เปิดแผงย่อยของโหมดเล่น
 for (const b of document.querySelectorAll("[data-panel]")) b.onclick = () => { for (const p of document.querySelectorAll(".subpanel")) p.hidden = p.id !== b.dataset.panel; SFX.play("click"); };
 for (const b of document.querySelectorAll("[data-close]")) b.onclick = () => (b.closest(".subpanel").hidden = true);
@@ -1637,7 +1650,8 @@ $("go").onclick = () => {
   const mine = deckSpec($("mydeck").value), bot = deckSpec($("botdeck").value);
   if (typeof mine === "string" || typeof bot === "string") { $("deckinfo").textContent = typeof mine === "string" ? mine : bot; return; }
   role = "bot"; remember(); HINTS = SET.hints; hintSeen.clear();
-  newSession(["local", "bot"], [myName(), "บอท"], [mine, bot], { botDelay: Math.round(BOTDELAY * SET.speed) });
+  const LVNAME = { easy: "บอท (ง่าย)", normal: "บอท", hard: "บอท (ยาก)" };
+  newSession(["local", "bot"], [myName(), LVNAME[SET.botLevel] || "บอท"], [mine, bot], { botDelay: Math.round(BOTDELAY * SET.speed), botLevel: SET.botLevel });
 };
 
 // ---------------------------------------------------------------- ออนไลน์ (PeerJS: เชื่อมเครื่องตรงหากัน ไม่ต้องมีเซิร์ฟเวอร์ของเราเอง)
@@ -2080,7 +2094,7 @@ function hints() {
 $("practice").onclick = () => {
   HINTS = true; hintSeen.clear(); role = "bot"; remember();
   const mine = deckSpec($("mydeck").value); if (typeof mine === "string") return netmsg(esc(mine));
-  newSession(["local", "bot"], [myName(), "บอท"], [mine, { arch: ARCHS[Math.floor(Math.random() * ARCHS.length)][0] }], { botDelay: Math.round(900 * SET.speed) });
+  newSession(["local", "bot"], [myName(), "บอท (ง่าย)"], [mine, { arch: ARCHS[Math.floor(Math.random() * ARCHS.length)][0] }], { botDelay: Math.round(900 * SET.speed), botLevel: "easy" });
 };
 
 // ---------------------------------------------------------------- ทดสอบ

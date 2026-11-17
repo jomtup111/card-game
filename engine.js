@@ -417,7 +417,11 @@
     }                      // เหตุการณ์ให้หน้าจอเล่นอนิเมชัน
     other(p) { return p === this.P[0] ? this.P[1] : this.P[0]; }
     mulligan(p, cards) { for (const c of cards) { const i = p.hand.indexOf(c); if (i >= 0) p.hand.splice(i, 1); } p.deck.push(...cards); shuffle(p.deck, this.rnd); p.draw(cards.length); }
+    // ระดับบอท: p.level = "easy" | "normal" (ค่าเริ่มต้น) | "hard"
+    //   easy: ไม่ mulligan, ข้ามการเล่นบ้าง, เลือกเป้าแบบสุ่ม, ไม่รุมตี, ไม่ใช้เวทสวน
+    //   hard: จัดคู่ตีแบบประหยัด (ตัวเล็กสุดที่ล้มเป้าใหญ่สุดได้), ใช้เวทสวนเฉพาะที่เปลี่ยนผล, ตีหน้าทันทีเมื่อฆ่าได้
     botMulligan(p) {
+      if (p.level === "easy") return;
       const out = []; let cheap = 0;
       for (const c of [...p.hand].sort((a, b) => (a.type !== "มอน") - (b.type !== "มอน") || a.cost - b.cost)) {
         const mon = c.type === "มอน" && !c.kw["หลับใหล"];
@@ -1119,7 +1123,7 @@
       }
       if (shooters && !e.field.length) this.hurt(e, 1, " (ถูกยิง)");
       this.awakenCheck(p);
-      p.draw(this.opt.draw || DRAW);
+      p.draw((this.opt.draw || DRAW) + (p.bonusDraw && p.turns % p.bonusDraw === 0 ? 1 : 0));   // bonusDraw = บอทยาก: จั่วเพิ่ม 1 ใบทุก N เทิร์นของตัวเอง
       if (this.opt.minHand && p.hand.length < this.opt.minHand && !p.lost) p.draw(this.opt.minHand - p.hand.length);   // กติกาทดลอง: เติมมือขั้นต่ำ
       if (p.lost) this.log(`${p.name} เดคหมด`);
       this.checkEnd();
@@ -1154,18 +1158,20 @@
 
     // ---------- บอท
     async botTurn(react, pause = async () => {}) {
-      const p = this.P[this.cur], e = this.other(p);
+      const p = this.P[this.cur], e = this.other(p), easy = p.level === "easy", hard = p.level === "hard";
+      const roll = (x) => this.rnd() < x;
       for (const ab of this.abilities(p)) if (!ab.err && (ab.key.startsWith("recycle") || (ab.key.startsWith("revive") && p.hand.some((c) => value(c) < 1)))) { this.useAbility(p, ab.key); await pause(); }
       const summonPhase = async () => {
         while (!this.winner) {
           let best = null;
+          if (easy && roll(0.3)) break;                                    // ง่าย: บางทีก็ไม่ลงเพิ่ม
           for (const c of p.hand) {
             if (this.canSummon(p, c)) continue;
             const fod = this.autoPay(p, this.cost(p, c), c); if (fod == null) continue;
             const lost = fod.reduce((s, x) => s + value(x), 0) - fod.filter((x) => x.ondiscard.length).length;
             const gain = c.base + (c.enter.length ? 2 : 0) + (c.kw["พรีกาย"] ? 1 : 0) + (c.leader ? 3 : 0);
-            if (lost > gain + 1) continue;
-            const score = gain - lost * 0.5; if (!best || score > best[0]) best = [score, c, fod];
+            if (lost > gain + (hard ? 0 : 1)) continue;
+            const score = (easy ? this.rnd() * 6 : 0) + gain - lost * 0.5; if (!best || score > best[0]) best = [score, c, fod];
           }
           if (!best) break;
           await this.summon(p, best[1], best[2], react); await pause();
@@ -1177,6 +1183,7 @@
       const prio = { titan: 5, awakenall: 5, cheat: 4, killbig: 4, kill: 3, steal: 3 };
       for (const c of p.hand.filter((c) => c.type === "เวทปกติ" && c.spell.length).sort((a, b) => (prio[b.spell[0][0]] || 0) - (prio[a.spell[0][0]] || 0) || value(b) - value(a))) {
         if (this.spellUsable(p, c)) continue;
+        if (easy && roll(0.5)) continue;
         const k = c.spell[0][0];
         if (["kill", "bounce", "bottom", "curse", "freeze", "steal"].includes(k) && !e.field.length) continue;
         if (k === "killbig" && !e.field.some((u) => this.eff(e, u) >= c.spell[0][1])) continue;
@@ -1192,12 +1199,15 @@
       }
       await summonPhase();
       if (this.opt.wear) await this.botGang(p, e, react, pause);
-      if (this.opt.gang) await this.botGangAttack(p, e, react, pause);
+      if (this.opt.gang && !easy) await this.botGangAttack(p, e, react, pause);
+      if (hard) await this.botHardAttacks(p, e, react, pause);
       for (const u of [...p.field].sort((a, b) => this.eff(p, b) - this.eff(p, a))) {
+        if (easy && roll(0.25) && !u.h.mustAttack) continue;
         while (!this.winner && p.field.includes(u) && !this.canAttack(p, u)) {
           const ts = this.targets(p, u); if (!ts.length) break;
           let t = ts.includes("face") ? "face" : ts[0];
-          if (t !== "face") { const win = ts.filter((x) => u.has("พิษ") || this.eff(p, u, true, x) >= this.eff(e, x, false, u) + this.arm(x)); if (!win.length && !u.h.mustAttack && !(u.h.attackOrDie && !u.atkd)) break; t = win.length ? win.sort((a, b) => this.eff(e, b) - this.eff(e, a))[0] : ts.sort((a, b) => this.eff(e, a) - this.eff(e, b))[0]; }
+          if (t !== "face" && easy && roll(0.4)) t = ts[Math.floor(this.rnd() * ts.length)];       // ง่าย: เลือกเป้าแบบสุ่ม
+          else if (t !== "face") { const win = ts.filter((x) => u.has("พิษ") || this.eff(p, u, true, x) >= this.eff(e, x, false, u) + this.arm(x)); if (!win.length && !u.h.mustAttack && !(u.h.attackOrDie && !u.atkd)) break; t = win.length ? win.sort((a, b) => this.eff(e, b) - this.eff(e, a))[0] : ts.sort((a, b) => this.eff(e, a) - this.eff(e, b))[0]; }
           await this.attack(p, u, t, react); await pause();
         }
       }
@@ -1281,14 +1291,34 @@
         for (const u of use) { if (!e.field.includes(t) || this.winner) break; await this.attack(p, u, t, react); await pause(); }
       }
     }
+    // ยาก: จัดคู่ตีแบบประหยัด — ไล่เป้าจากตัวที่อันตรายสุด ใช้ตัวที่เล็กที่สุดที่ล้มได้โดยไม่ตาย (ตัวใหญ่เก็บไว้)
+    async botHardAttacks(p, e, react, pause) {
+      for (let guard = 0; guard < 12 && !this.winner; guard++) {
+        const ready = p.field.filter((u) => !this.canAttack(p, u)); if (!ready.length) return;
+        if (ready.filter((u) => this.targets(p, u).includes("face")).length >= e.hp) {   // ฆ่าได้: ตีหน้า
+          const u = ready.find((u) => this.targets(p, u).includes("face")); await this.attack(p, u, "face", react); await pause(); continue;
+        }
+        let pick = null;
+        for (const t of [...e.field].sort((a, b) => this.eff(e, b) - this.eff(e, a))) {
+          const D = (u) => this.eff(e, t, false, u) + this.arm(t);
+          const ok = ready.filter((u) => this.targets(p, u).includes(t) && (u.has("พิษ") || this.eff(p, u, true, t) >= D(u)) && !(t.has("พิษ") && !u.has("บิน")))
+            .sort((a, b) => this.eff(p, a) - this.eff(p, b));
+          if (ok.length) { pick = [ok[0], t]; break; }
+        }
+        if (!pick) return;
+        await this.attack(p, pick[0], pick[1], react); await pause();
+      }
+    }
     botReact(d, info) {
+      if (d.level === "easy") return null;
+      if (d.level === "hard" && info.attacker) { const keep = info.opts.filter((o) => this.reactUseful(d, o, info)); if (!keep.length) return null; info = { ...info, opts: keep }; }
       if (info.etb) return info.etb.leader || info.etb.enter.some((a) => ["kill", "wipe", "bounce", "bottom", "steal", "stealall", "edisc", "cheat", "raise"].includes(a[0])) ? info.opts[0] : null;
       if (info.spell) return ["kill", "wipe", "steal", "stealall", "bounce", "bottom", "curse", "edisc", "cheat", "titan"].includes(info.spell.spell[0][0]) ? info.opts[0] : null;
       if (!info.targetIsPlayer && info.target) {                     // ป้องกันชนะอยู่แล้ว ไม่ต้องเสียเวทสวน
         const a = this.other(d), A = this.eff(a, info.attacker, true, info.target), D = this.eff(d, info.target, false, info.attacker) + this.arm(info.target);
         if (D > A && !info.attacker.has("พิษ")) return null;
       }
-      const important = info.targetIsPlayer || (info.target && this.eff(d, info.target) >= 3);
+      const important = info.targetIsPlayer || (info.target && this.eff(d, info.target) >= (d.level === "hard" ? 1 : 3));
       if (!important) return null;
       return info.opts.find((o) => o.kind === "counter") || info.opts.find((o) => o.kind === "bodyguard") || null;
     }

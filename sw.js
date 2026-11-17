@@ -1,7 +1,7 @@
 // Service worker: เล่นได้แม้ไม่มีเน็ต (เกมกับบอท)
 //   หน้าเกม/สคริปต์ = ลองเน็ตก่อน (ได้เวอร์ชันใหม่เสมอ) ไม่มีเน็ตค่อยใช้ของที่เก็บไว้
 //   รูป / ฟอนต์ / ไลบรารี = ใช้ของที่เก็บไว้ก่อน (เร็ว) แล้วเก็บเพิ่มตอนโหลดครั้งแรก
-const CACHE = "banmo-1794900020";
+const CACHE = "banmo-1794900753";
 const SHELL = ["play.html", "engine.js", "session.js", "manifest.webmanifest", "icon-192.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => {
