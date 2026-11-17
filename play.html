@@ -214,6 +214,8 @@
     text-shadow: 3px 0 #1b1630, -3px 0 #1b1630, 0 3px #1b1630, 0 -3px #1b1630; animation: clash .75s ease-out forwards; }
   .clash.atk { color: var(--hi); } .clash.heavy { font-size: 30px; }
   @keyframes clash { 0% { transform: translate(-50%, -50%) scale(.3); opacity: 0; } 25% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; } 70% { transform: translate(-50%, -60%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -90%) scale(.9); opacity: 0; } }
+  body.watching::after { content: "👀 โหมดผู้ชม"; position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 30; background: #1b1630d0; color: var(--hi); padding: 4px 12px; font-size: 13px; pointer-events: none; }
+  body.watching #mhand { display: none; }
   .ftable { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; } .ftable th { text-align: left; color: var(--hi); font-weight: normal; padding: 4px 6px; border-bottom: 2px solid #ffffff22; }
   .ftable td { padding: 6px; border-bottom: 1px solid #ffffff14; } .ftable .ok { color: var(--ok); } .ftable .err { color: #ff7080; }
   .shard { position: absolute; pointer-events: none; image-rendering: pixelated; }
@@ -691,7 +693,7 @@
     <h3>เล่นกับเพื่อน (ออนไลน์)</h3>
     <div class="friendgrid">
       <div><p class="muted">สร้างห้องแล้วส่งรหัสให้เพื่อน</p><button class="main big" id="host">สร้างห้อง</button></div>
-      <div><p class="muted">มีรหัสจากเพื่อน?</p><label><input id="joincode" maxlength="5" placeholder="รหัส 5 ตัว" style="text-transform:uppercase"><button class="main" id="join">เข้าห้อง</button></label></div>
+      <div><p class="muted">มีรหัสจากเพื่อน?</p><label><input id="joincode" maxlength="5" placeholder="รหัส 5 ตัว" style="text-transform:uppercase"><button class="main" id="join">เข้าห้อง</button><button id="watchbtn" title="ดูเพื่อนเล่น (กดอะไรไม่ได้)">👀 ดู</button></label></div>
     </div>
     <div id="netmsg" class="muted"></div>
     <div class="btns"><button id="fstats">📊 สถิติกับเพื่อน</button><button data-close>ปิด</button></div>
@@ -821,7 +823,7 @@ const saveSet = () => { try { localStorage.setItem("settings", JSON.stringify(SE
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms * SET.speed));
 const abilityHtml = (t) => { let h = esc(t).replace(/; /g, "<br>"); for (const k of KW) h = h.split(k).join(`<span class="kw">${k}</span>`); return h; };
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
-const FAST = location.hash === "#auto" || location.hash === "#nethost" || location.hash === "#netguest";   // ทดสอบ: ข้ามอนิเมชัน
+const FAST = location.hash === "#auto" || location.hash === "#nethost" || location.hash === "#netguest" || location.hash === "#netwatch";   // ทดสอบ: ข้ามอนิเมชัน
 
 // ---------------------------------------------------------------- ขนาดการ์ดตามจอ
 function layout() {
@@ -933,6 +935,7 @@ const log = (s) => { const d = document.createElement("div"); if (s.startsWith("
 const toast = (s) => { $("msg").textContent = s; $("msg").className = "px-text err"; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastTimer = 0; render(); }, 2500); };
 
 function act(a) {
+  if (role === "watch") return toast("โหมดผู้ชม: ดูได้อย่างเดียว");
   mode = "idle"; sel = null; gang = []; fodder = new Set();
   if (role === "guest") { if (conn && conn.open) conn.send({ type: "act", a }); else toast("ไม่ได้เชื่อมต่อกับห้อง"); }
   else S.act(0, a).then((err) => err && toast(err));
@@ -1303,7 +1306,7 @@ const unitAnim = (x) => { const k = x.kws || []; return (k.includes("บิน")
 // หน้า mulligan เต็มจอ: การ์ดใหญ่กลางจอ แตะ = เปลี่ยน (✕)
 function mullScreen() {
   let m = $("mullscreen");
-  const want = V && V.phase === "mull";
+  const want = V && V.phase === "mull" && role !== "watch";
   if (!want) { if (m && !m.classList.contains("out")) { m.classList.add("out"); setTimeout(() => m.remove(), 460); } return; }
   if (!m) { m = document.createElement("div"); m.id = "mullscreen"; document.body.appendChild(m); }
   const hero = (h) => { const r = ROW[h]; return r && r.art ? `img/${r.art}.png` : ""; };
@@ -1602,8 +1605,8 @@ function openFriendStats() {
   document.body.appendChild(m); m.querySelector("#fsx").onclick = () => m.remove();
 }
 function gameOver() {
-  SFX.play(V.winner === "me" ? "win" : "lose");
-  if (!FAST && !gameOver.scened) {
+  SFX.play(V.winner === "me" || role === "watch" ? "win" : "lose");
+  if (!FAST && !gameOver.scened && role !== "watch") {
     gameOver.scened = true;
     if (V.winner === "me") { for (let k = 0; k < 4; k++) setTimeout(() => burst("img/ui_star.png", [innerWidth * (0.2 + Math.random() * 0.6), innerHeight * (0.25 + Math.random() * 0.4)], 18, 160, 1100, 22), k * 250); banner("ชนะ!"); }
     else { const d = document.createElement("div"); d.className = "endfade"; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); banner("แพ้…"); }
@@ -1611,6 +1614,14 @@ function gameOver() {
   }
   gameOver.scened = false;
   if (role === "host" || role === "guest") return gameOverOnline();
+  if (role === "watch") {                                               // ผู้ชม: บอกว่าใครชนะ (ไม่ใช่ "คุณชนะ/แพ้")
+    const m = document.createElement("div"); m.className = "modal"; const wn = V.winner === "me" ? V.me.name : V.opp.name;
+    m.innerHTML = `<div class="endscreen panel win"><div class="ribbon">${esc(wn)} ชนะ!</div><p class="muted">${esc(V.me.name)} vs ${esc(V.opp.name)} · ${V.turn} เทิร์น</p>
+      <p class="muted">ถ้าเล่นต่อในห้องเดิม จะดูเกมถัดไปได้อัตโนมัติ</p><div class="btns"><button id="stay">ดูกระดาน</button><button id="wleave">ออก</button></div></div>`;
+    m.querySelector("#stay").onclick = () => { m.style.display = "none"; showBackBtn(m); };
+    m.querySelector("#wleave").onclick = () => (location.href = location.pathname);
+    return document.body.appendChild(m);
+  }
   const m = document.createElement("div"); m.className = "modal";
   m.innerHTML = `<div class="endscreen panel ${V.winner === "me" ? "win" : "lose"}">${endHead()}
     <div class="btns"><button class="main" id="again">${role === "bot" ? "เล่นอีกครั้ง" : "กลับหน้าแรก"}</button>${role === "bot" ? `<button id="tomenu">เมนูหลัก</button>` : ""}<button id="stay">ดูกระดาน</button></div></div>`;
@@ -1663,8 +1674,11 @@ function notice(title, body) {
 function newSession(seats, names, decks, opts = {}) {
   overShown = false; V = null; queue.length = 0; $("log").innerHTML = ""; $("hist").innerHTML = ""; $("title").style.display = "none";
   S = new Session({ cards: ALL, decks, names, seats, seed: Date.now() & 0x7fffffff,
-    onView: (i, v) => { if (i === 0) setView(v); else if (conn && conn.open) conn.send({ type: "view", v }); },
-    onLog: (s) => { log(s); NET.logs.push(s); if (NET.logs.length > 400) NET.logs.shift(); if (conn && conn.open) conn.send({ type: "log", s }); },
+    onView: (i, v) => {
+      if (i === 0) { setView(v); NET.lastView = v; for (const w of NET.watchers) if (w.open) w.send({ type: "view", v: watchView(v) }); }
+      else if (conn && conn.open) conn.send({ type: "view", v });
+    },
+    onLog: (s) => { log(s); NET.logs.push(s); if (NET.logs.length > 400) NET.logs.shift(); if (conn && conn.open) conn.send({ type: "log", s }); for (const w of NET.watchers) if (w.open) w.send({ type: "log", s }); },
     // ถามเพื่อน (เวทสวน): เก็บคำถามไว้ ส่งซ้ำได้ถ้าเพื่อนหลุดแล้วกลับมา
     ask: (i, p) => (i === 0 ? askModal(p) : new Promise((res) => { pendingAsk = res; NET.askP = p; if (conn && conn.open) conn.send({ type: "ask", p }); })),
     ...opts });
@@ -1859,12 +1873,14 @@ const QRLIB = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.
 function roomShareHtml(code, link) {
   return `<div class="share"><div class="sharel">รหัสห้อง <span class="code">${code}</span>
       <div class="sharebtns"><button id="shcopy">📋 คัดลอกลิงก์</button>${navigator.share ? `<button id="shshare">📤 แชร์</button>` : ""}<a class="btnlike line" id="shline" target="_blank" rel="noopener" href="https://line.me/R/msg/text/?${encodeURIComponent("มาเล่น Battle of Banmo กัน! กดลิงก์เข้าห้อง " + code + " : " + link)}">LINE</a></div>
-      <div class="muted" id="shmsg">ส่งลิงก์หรือให้เพื่อนสแกน QR · รอเพื่อนเข้าห้อง…</div></div>
+      <div class="muted" id="shmsg">ส่งลิงก์หรือให้เพื่อนสแกน QR · รอเพื่อนเข้าห้อง…</div>
+      <div class="muted" style="font-size:12px">คนอื่นอยากดู: ใส่รหัสห้องแล้วกด 👀 ดู หรือ <button id="shwatch" style="font-size:12px;padding:2px 8px">คัดลอกลิงก์ดู</button></div></div>
     <div class="qr" id="shqr" title="สแกนเพื่อเข้าห้อง"></div></div>`;
 }
 function wireRoomShare(code, link) {
   const msg = (t) => { const m = $("shmsg"); if (m) m.textContent = t; };
   const cp = $("shcopy"); if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(link); msg("คัดลอกลิงก์แล้ว ✓ วางส่งเพื่อนได้เลย"); } catch { prompt("คัดลอกลิงก์นี้", link); } };
+  const sw = $("shwatch"); if (sw) sw.onclick = async () => { const wl = link.replace("?room=", "?watch="); try { await navigator.clipboard.writeText(wl); msg("คัดลอกลิงก์ดูแล้ว ✓"); } catch { prompt("ลิงก์ให้คนดู", wl); } };
   const sh = $("shshare"); if (sh) sh.onclick = () => navigator.share({ title: "Battle of Banmo", text: `มาเล่นกัน! ห้อง ${code}`, url: link }).catch(() => {});
   const draw = () => { const q = $("shqr"); if (!q || !window.QRCode) return; q.innerHTML = ""; new QRCode(q, { text: link, width: 132, height: 132, colorDark: "#1b1630", colorLight: "#fff6e0", correctLevel: QRCode.CorrectLevel.M }); };
   if (window.QRCode) draw(); else { const sc = document.createElement("script"); sc.src = QRLIB; sc.onload = draw; sc.onerror = () => { const q = $("shqr"); if (q) q.remove(); }; document.head.appendChild(sc); }
@@ -1897,14 +1913,21 @@ function rematchStatus() {
 function tryRematch() {
   if (role !== "host" || !rematch.me || !rematch.guest) return;
   const decks = [rematch.me, rematch.guest];
-  conn.send({ type: "newgame" }); resetForNewGame();
+  conn.send({ type: "newgame" }); for (const w of NET.watchers) if (w.open) w.send({ type: "newgame" }); resetForNewGame();
   newSession(["local", "remote"], [myName(), guestName], decks);
 }
 
 // ---------- ต่อห้องใหม่เมื่อหลุด
 // เพื่อนมี token ประจำตัว (เก็บใน sessionStorage ของแท็บ) — เจ้าของห้องรับคนเดิมกลับเข้าเกมเดิมได้
 // ตรวจการเชื่อมต่อด้วย ping ทุก 4 วิ ถ้าเงียบเกิน 12 วิ ถือว่าหลุด (PeerJS บางครั้งไม่แจ้ง close)
-const NET = { token: null, code: null, lastSeen: 0, hb: 0, logs: [], askP: null, retry: 0, answer: null, askOpen: false };
+const NET = { token: null, code: null, lastSeen: 0, hb: 0, logs: [], askP: null, retry: 0, answer: null, askOpen: false, watchers: [], lastView: null };
+// ผู้ชม: เห็นกระดานจากมุมเจ้าของห้อง แต่ซ่อนการ์ดในมือ (เหลือแค่จำนวน) และกดอะไรไม่ได้
+function watchView(v) {
+  const w = JSON.parse(JSON.stringify(v)); w.watch = true; w.myTurn = false;
+  w.me.handCount = (w.me.hand || []).length; w.me.hand = [];
+  for (const x of [...w.me.field, ...w.opp.field]) { x.atkErr = "ผู้ชม"; x.targets = []; x.pred = {}; }
+  return w;
+}
 const sstore = { get: (k) => { try { return sessionStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { sessionStorage.setItem(k, v); } catch {} }, del: (k) => { try { sessionStorage.removeItem(k); } catch {} } };
 const forgetRoom = () => sstore.del("room");
 function netWait(text) {
@@ -1954,7 +1977,14 @@ function hostData(c, d) {
   if (c === conn) NET.lastSeen = Date.now();
   if (d.type === "ping") return c.open && c.send({ type: "pong" });
   if (d.type === "pong") return;
-  if (d.type === "emote") return Number.isInteger(d.k) && showEmote(false, d.k);
+  if (d.type === "emote") return c === conn && Number.isInteger(d.k) && showEmote(false, d.k);
+  if (d.type === "hello" && d.role === "watch") {                      // ผู้ชม: ไม่แย่งที่เพื่อน · ส่งกระดานปัจจุบัน · ไม่รับคำสั่งใดๆ
+    if (NET.watchers.filter((w) => w.open).length >= 4) { c.send({ type: "full" }); setTimeout(() => c.close(), 500); return; }
+    NET.watchers = NET.watchers.filter((w) => w.open); NET.watchers.push(c);
+    c.on("close", () => (NET.watchers = NET.watchers.filter((w) => w !== c)));
+    if (S && NET.lastView) { c.send({ type: "resume", logs: NET.logs }); c.send({ type: "view", v: { ...watchView(NET.lastView), fx: [] } }); } else c.send({ type: "wait" });
+    toast(`${String(d.name || "มีคน").slice(0, 16)} เข้ามาดู`); return;
+  }
   if (d.type === "hello") {
     if (S) {                                                            // เกมกำลังเล่นอยู่: รับเฉพาะเพื่อนคนเดิมกลับเข้ามา
       if (!d.token || d.token !== NET.token) { c.send({ type: "full" }); setTimeout(() => c.close(), 500); return; }
@@ -2020,6 +2050,7 @@ async function guestData(c, d) {
   if (d.type === "pong") return;
   if (d.type === "emote") { if (Number.isInteger(d.k)) showEmote(false, d.k); }
   else if (d.type === "view") { $("title").style.display = "none"; setView(d.v); }
+  else if (d.type === "wait") netmsg("เข้าห้องแล้ว รอเจ้าของห้องเริ่มเกม… (โหมดผู้ชม)");
   else if (d.type === "meet") { NET.oppPid = typeof d.pid === "string" ? d.pid.slice(0, 16) : null; }
   else if (d.type === "resume") { console.log("RESUME guest"); netWaitOff(); $("log").innerHTML = ""; for (const s of d.logs || []) log(String(s)); toast("กลับเข้าห้องแล้ว"); }
   else if (d.type === "log") log(String(d.s));
@@ -2049,6 +2080,21 @@ function guestLost() {
 }
 $("host").onclick = () => { if (!peer) { peer = "starting"; hostRoom(); } };
 $("join").onclick = () => { if (!peer) { peer = "starting"; joinRoom($("joincode").value); } };
+$("watchbtn").onclick = () => { if (!peer) { peer = "starting"; watchRoom($("joincode").value); } };
+async function watchRoom(code) {
+  role = "watch"; code = String(code || "").trim().toUpperCase();
+  if (!/^[A-Z0-9]{5}$/.test(code)) { peer = null; return netmsg("รหัสห้องต้องมี 5 ตัว"); }
+  try { await loadPeer(); } catch (e) { peer = null; return netmsg(esc(e.message)); }
+  NET.code = code; netmsg("กำลังเข้าไปดู…"); document.body.classList.add("watching");
+  peer = new Peer(PEEROPT);
+  peer.on("error", (e) => { if (!V) netmsg(e.type === "peer-unavailable" ? "ไม่พบห้องนี้" : `เชื่อมต่อไม่ได้: ${esc(e.type)}`); });
+  peer.on("open", () => {
+    const c = peer.connect(PREFIX + code, { reliable: true }); conn = c;
+    c.on("open", () => c.send({ type: "hello", role: "watch", name: myName() }));
+    c.on("data", (d) => guestData(c, d));
+    c.on("close", () => { if (conn === c) { conn = null; toast("ห้องปิดแล้ว"); } });
+  });
+}
 // เปิดด้วยลิงก์เดค (?deck=): โชว์ตัวอย่างเดค + ปุ่มบันทึก (ไม่ทับเดคเดิม) แล้วลบพารามิเตอร์ออกจาก URL
 (function () {
   const q = new URLSearchParams(location.search), code = q.get("deck"); if (!code) return;
@@ -2073,7 +2119,8 @@ $("join").onclick = () => { if (!peer) { peer = "starting"; joinRoom($("joincode
     m.querySelector("#dpx2").onclick = () => m.remove();
   };
 })();
-const roomParam = new URLSearchParams(location.search).get("room");
+const roomParam = new URLSearchParams(location.search).get("room"), watchParam = new URLSearchParams(location.search).get("watch");
+if (watchParam) { $("joincode").value = watchParam.toUpperCase(); $("pfriend").hidden = false; netmsg("กด <b>👀 ดู</b> เพื่อดูเพื่อนเล่น"); if (location.hash === "#netwatch") $("watchbtn").click(); }
 if (roomParam) { $("joincode").value = roomParam.toUpperCase(); $("pfriend").hidden = false; netmsg("ใส่ชื่อ เลือกเดค แล้วกด <b>เข้าห้อง</b>"); }
 (() => {                                                              // เคยอยู่ในห้องในแท็บนี้: เสนอกลับเข้าห้องเดิม
   let saved = null; try { saved = JSON.parse(sstore.get("room") || "null"); } catch {}
@@ -2458,6 +2505,9 @@ function autoStep() {
   else if (spells.length && r < 0.55) act({ t: "cast", k: one(spells)[1] });
   else if (atk.length && r < 0.92) { const x = one(atk); act({ t: "attack", uid: x.uid, target: one(x.targets) }); }
   else act({ t: "end" });
+}
+if (location.hash === "#netwatch") {                                   // ทดสอบผู้ชม: รายงานเมื่อเห็นเกมจบ + ตรวจว่าไม่เห็นการ์ดในมือ
+  const t = setInterval(() => { if (V && V.phase === "over") { clearInterval(t); parent.postMessage({ watchdone: 1, hand: V.me.hand.length, handCount: V.me.handCount, turn: V.turn }, "*"); } }, 300);
 }
 if (location.hash === "#nethost" || location.hash === "#netguest") {
   window.AUTOPLAY = true; $("myname").value = location.hash === "#nethost" ? "เจ้าของห้อง" : "เพื่อน";
