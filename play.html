@@ -315,6 +315,27 @@
   .arrow-svg { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 65; display: none; }
   .arrow-svg.on { display: block; }
 
+  /* ================= ไฮไลต์ (เด่นขึ้น) ================= */
+  .card .hl { position: absolute; inset: calc(-3px * var(--s)); border-radius: calc(4px * var(--s)); pointer-events: none; z-index: 3; }
+  .card.playable .hl { border: 4px solid #6ad08a; box-shadow: 0 0 14px 3px #6ad08acc, inset 0 0 10px #6ad08a88; animation: hlpulse 1.1s ease-in-out infinite; }
+  .card.sel .hl { border: 5px solid #ffd860; box-shadow: 0 0 22px 6px #ffd860dd, inset 0 0 14px #ffd86099; }
+  .card.fodder .hl { border: 5px solid #40d0ff; box-shadow: 0 0 20px 5px #40d0ffcc, inset 0 0 12px #40d0ff88; }
+  .card.target .hl { border: 5px solid #ff4058; box-shadow: 0 0 22px 6px #ff4058dd; animation: hlpulse .7s ease-in-out infinite; }
+  @keyframes hlpulse { 50% { box-shadow: 0 0 26px 8px var(--hlc, #6ad08acc), inset 0 0 14px var(--hlc, #6ad08a88); opacity: .75; } }
+  .card.target .hl { --hlc: #ff4058; } .card.playable .hl { --hlc: #6ad08a; }
+  .row.hand .card.unplayable { filter: brightness(.7) saturate(.7) drop-shadow(0 4px 4px #000a); }
+  .pick-tag { position: absolute; left: 50%; top: calc(-6px * var(--s)); transform: translateX(-50%); z-index: 4; white-space: nowrap; pointer-events: none;
+              font-weight: 600; font-size: 14px; padding: 2px 10px; color: #1b1630; box-shadow: 0 0 0 2px #1b1630, 0 3px 0 #1b1630; }
+  .pick-tag.sum { background: #ffd860; } .pick-tag.pay { background: #40d0ff; } .pick-tag.mull { background: #ff9a60; }
+  /* มอนบนสนาม: กรอบเรืองแทน drop-shadow */
+  .card.minion.ready .m-art { box-shadow: 0 0 0 3px var(--rc), 0 0 0 7px #6ad08a, 0 0 18px 8px #6ad08acc; animation: readypulse 1.1s ease-in-out infinite; }
+  @keyframes readypulse { 50% { box-shadow: 0 0 0 3px var(--rc), 0 0 0 7px #6ad08a, 0 0 28px 12px #6ad08a; } }
+  .card.minion.sel .m-art { box-shadow: 0 0 0 3px var(--rc), 0 0 0 8px #ffd860, 0 0 26px 10px #ffd860dd; }
+  .card.minion.target .m-art { box-shadow: 0 0 0 3px var(--rc), 0 0 0 8px #ff4058, 0 0 26px 10px #ff4058dd; animation: targetpulse .7s ease-in-out infinite; }
+  @keyframes targetpulse { 50% { box-shadow: 0 0 0 3px var(--rc), 0 0 0 10px #ff4058, 0 0 34px 14px #ff4058; } }
+  .card.minion.ready, .card.minion.sel, .card.minion.target { filter: drop-shadow(0 4px 3px #000a); animation: none; }
+  .card.minion .hl { display: none; }
+
   /* ---------- จอแคบ / มือถือ ---------- */
   @media (max-width: 999px) {
     #app { grid-template-columns: 1fr; }
@@ -549,6 +570,7 @@ function cardEl(v, o = {}) {
     ${pw !== "" ? `<div ${u(46, 79, 17, 17, "background-image:url(img/badge_power.png)")} class="u badge power${pcls}${pw.length > 1 ? " two" : ""}">${pw}</div>` : ""}
     ${v.leader ? `<div class="tag">หัวหน้า</div>` : v.onlyone ? `<div class="tag">Only One</div>` : ""}
     ${st ? `<div class="status">${st}</div>` : ""}`;
+  if (!o.minion) el.insertAdjacentHTML("beforeend", `<div class="hl"></div>${o.tag ? `<div class="pick-tag ${o.tag[0]}">${esc(o.tag[1])}</div>` : ""}`);   // ชั้นไฮไลต์ + ป้าย
   const img = el.querySelector(".art img");
   if (img) img.onload = () => fitCard(el);
   requestAnimationFrame(() => fitCard(el));                              // การ์ดที่ไม่ได้ผ่าน render() (หน้าต่าง / ภาพขยาย)
@@ -854,12 +876,13 @@ function render() {
   if ((V.phase !== "mull" || V.mullDone) && mode === "mull") mode = "idle";
   const hand = $("mhand"); hand.innerHTML = "";
   V.me.hand.forEach((h, k) => {
-    let cls = "";
-    if (mode === "pay") cls = k === sel ? "sel" : fodder.has(k) ? "fodder click" : h.gem > 0 ? "click" : "dim";
-    else if (mode === "mull") cls = fodder.has(k) ? "fodder click" : "click";
-    else if (V.myTurn) cls = "click";
+    let cls = "", tag = null;
+    const playable = !h.err && (h.costNow == null || h.costNow === 0 || h.auto.length);
+    if (mode === "pay") { cls = k === sel ? "sel" : fodder.has(k) ? "fodder click" : h.gem > 0 ? "click" : "dim"; tag = k === sel ? ["sum", "อัญเชิญ"] : fodder.has(k) ? ["pay", `ทิ้ง +${h.gem} gem`] : null; }
+    else if (mode === "mull") { cls = fodder.has(k) ? "fodder click" : "click"; if (fodder.has(k)) tag = ["mull", "เปลี่ยน"]; }
+    else if (V.myTurn) cls = playable ? "click playable" : "click unplayable";
     if (h.dead) cls += " dead";
-    const el = cardEl(ROW[h.id], { costNow: h.costNow, cls }); el.dataset.id = h.id;
+    const el = cardEl(ROW[h.id], { costNow: h.costNow, cls, tag }); el.dataset.id = h.id;
     el.onclick = () => { if (dragJustEnded) return; clickHand(h, k); };
     el.addEventListener("pointerdown", (ev) => startDrag(ev, el, h, k));
     hand.appendChild(el);
