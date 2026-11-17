@@ -214,6 +214,8 @@
     text-shadow: 3px 0 #1b1630, -3px 0 #1b1630, 0 3px #1b1630, 0 -3px #1b1630; animation: clash .75s ease-out forwards; }
   .clash.atk { color: var(--hi); } .clash.heavy { font-size: 30px; }
   @keyframes clash { 0% { transform: translate(-50%, -50%) scale(.3); opacity: 0; } 25% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; } 70% { transform: translate(-50%, -60%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -90%) scale(.9); opacity: 0; } }
+  .ftable { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; } .ftable th { text-align: left; color: var(--hi); font-weight: normal; padding: 4px 6px; border-bottom: 2px solid #ffffff22; }
+  .ftable td { padding: 6px; border-bottom: 1px solid #ffffff14; } .ftable .ok { color: var(--ok); } .ftable .err { color: #ff7080; }
   .shard { position: absolute; pointer-events: none; image-rendering: pixelated; }
   .pdot { position: absolute; width: 6px; height: 6px; pointer-events: none; box-shadow: 0 0 0 1px #1b163080; }
   .powpop { position: absolute; font-family: "Press Start 2P"; font-size: 24px; pointer-events: none; animation: powpop .9s ease-out forwards; }
@@ -692,7 +694,7 @@
       <div><p class="muted">มีรหัสจากเพื่อน?</p><label><input id="joincode" maxlength="5" placeholder="รหัส 5 ตัว" style="text-transform:uppercase"><button class="main" id="join">เข้าห้อง</button></label></div>
     </div>
     <div id="netmsg" class="muted"></div>
-    <div class="btns"><button data-close>ปิด</button></div>
+    <div class="btns"><button id="fstats">📊 สถิติกับเพื่อน</button><button data-close>ปิด</button></div>
   </div>
   <div class="mascots" id="mascots"></div>
 </div>
@@ -986,7 +988,7 @@ function applyView(v) {
     }
     if (V.phase === "play" && (prev.phase !== "play" || prev.turn !== V.turn)) { banner(prev.phase === "mull" ? (V.myTurn ? "คุณเริ่มก่อน!" : `${V.whoseTurn} เริ่มก่อน`) : V.myTurn ? "ตาคุณ!" : `ตาของ ${V.whoseTurn}`); if (V.myTurn) SFX.play("turn"); }
   }
-  if (V.phase === "over" && !overShown) { overShown = true; setTimeout(gameOver, FAST ? 0 : 700); }
+  if (V.phase === "over" && !overShown) { overShown = true; try { recordFriend(); } catch (e) { console.warn(e); } setTimeout(gameOver, FAST ? 0 : 700); }
   if (window.AUTOPLAY) setTimeout(autoStep, 30);
 }
 
@@ -1575,6 +1577,30 @@ function pickDiscard(ab) {
   m.querySelector("#pdno").onclick = () => m.remove();
   document.body.appendChild(m);
 }
+// ---------------------------------------------------------------- สถิติกับเพื่อน (เก็บในเครื่อง · เฉพาะเกมออนไลน์ที่จบจริง)
+// ผูกกับรหัสผู้เล่นถาวรของเพื่อน (ไม่ใช่ชื่อ เพราะเปลี่ยนชื่อได้) · แสดงชื่อล่าสุด · เกมที่หลุด/ออกก่อนจบไม่นับ
+const MYPID = (() => { let p = store.get("pid"); if (!p) { p = Math.random().toString(36).slice(2, 12); store.set("pid", p); } return p; })();
+const loadFriends = () => { try { const o = JSON.parse(store.get("friends") || "{}"); return o && typeof o === "object" ? o : {}; } catch { return {}; } };
+function recordFriend() {
+  if ((role !== "host" && role !== "guest") || !NET.oppPid || !V || V.phase !== "over") return;
+  const all = loadFriends(), f = all[NET.oppPid] || { name: "", w: 0, l: 0, fast: 0, mine: {}, theirs: {} }, win = V.winner === "me";
+  f.name = V.opp.name; f.last = Date.now(); win ? f.w++ : f.l++;
+  if (win && (!f.fast || V.turn < f.fast)) f.fast = V.turn;
+  f.mine[V.me.arch] = (f.mine[V.me.arch] || 0) + 1; f.theirs[V.opp.arch] = (f.theirs[V.opp.arch] || 0) + 1;
+  all[NET.oppPid] = f; store.set("friends", JSON.stringify(all));
+}
+const topKey = (o) => Object.entries(o || {}).sort((a, b) => b[1] - a[1])[0];
+function openFriendStats() {
+  const list = Object.values(loadFriends()).sort((a, b) => b.w + b.l - (a.w + a.l));
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="box panel" style="max-width:560px"><h2 class="px-text">📊 สถิติกับเพื่อน</h2>
+    ${list.length ? `<table class="ftable"><tr><th>เพื่อน</th><th>ชนะ–แพ้</th><th>ชนะเร็วสุด</th><th>เดคที่เพื่อนใช้บ่อย</th><th>เดคที่คุณใช้บ่อย</th></tr>
+      ${list.map((f) => { const t = topKey(f.theirs), me = topKey(f.mine), n = f.w + f.l; return `<tr><td><b>${esc(f.name)}</b></td><td><b class="${f.w >= f.l ? "ok" : "err"}">${f.w}–${f.l}</b> <span class="muted">(${Math.round((f.w / n) * 100)}%)</span></td>
+        <td>${f.fast ? f.fast + " เทิร์น" : "–"}</td><td>${t ? esc(t[0]) + ` <span class="muted">×${t[1]}</span>` : "–"}</td><td>${me ? esc(me[0]) + ` <span class="muted">×${me[1]}</span>` : "–"}</td></tr>`; }).join("")}</table>`
+      : `<p class="muted">ยังไม่มีเกมกับเพื่อน · เล่นออนไลน์จนจบเกม แล้วสถิติจะขึ้นที่นี่</p>`}
+    <p class="muted" style="font-size:12px">เก็บไว้ในเครื่องนี้เท่านั้น · นับเฉพาะเกมที่เล่นจนจบ</p><div class="btns"><button id="fsx">ปิด</button></div></div>`;
+  document.body.appendChild(m); m.querySelector("#fsx").onclick = () => m.remove();
+}
 function gameOver() {
   SFX.play(V.winner === "me" ? "win" : "lose");
   if (!FAST && !gameOver.scened) {
@@ -1943,6 +1969,7 @@ function hostData(c, d) {
     if (typeof deck === "string") { c.send({ type: "reject", s: deck }); setTimeout(() => c.close(), 500); return; }
     conn = c; NET.token = String(d.token || ""); heartbeat(c);
     guestName = String(d.name || "ผู้เล่น 2").slice(0, 16); if (guestName === myName()) guestName += " (2)";
+    NET.oppPid = typeof d.pid === "string" ? d.pid.slice(0, 16) : null; c.send({ type: "meet", pid: MYPID });   // รหัสผู้เล่นถาวร (สถิติกับเพื่อน)
     newSession(["local", "remote"], [myName(), guestName], [deckSpec($("mydeck").value), deck]);
     return;
   }
@@ -1979,7 +2006,7 @@ function guestConnect() {
   const c = peer.connect(PREFIX + NET.code, { reliable: true }); conn = c;
   c.on("open", () => {
     NET.retry = 0; heartbeat(c);
-    c.send({ type: "hello", token: NET.token, name: myName(), deck: deckSpec($("mydeck").value) });
+    c.send({ type: "hello", token: NET.token, name: myName(), deck: deckSpec($("mydeck").value), pid: MYPID });
     if (NET.answer != null) { c.send({ type: "answer", k: NET.answer.k }); NET.answer = null; }
     if (!V) netmsg("เข้าห้องแล้ว รอเจ้าของห้องเริ่ม…");
   });
@@ -1993,6 +2020,7 @@ async function guestData(c, d) {
   if (d.type === "pong") return;
   if (d.type === "emote") { if (Number.isInteger(d.k)) showEmote(false, d.k); }
   else if (d.type === "view") { $("title").style.display = "none"; setView(d.v); }
+  else if (d.type === "meet") { NET.oppPid = typeof d.pid === "string" ? d.pid.slice(0, 16) : null; }
   else if (d.type === "resume") { console.log("RESUME guest"); netWaitOff(); $("log").innerHTML = ""; for (const s of d.logs || []) log(String(s)); toast("กลับเข้าห้องแล้ว"); }
   else if (d.type === "log") log(String(d.s));
   else if (d.type === "err") toast(String(d.s));
@@ -2165,6 +2193,7 @@ function openBuilder() {
 }
 function closeBuilder() { $("builder").hidden = true; $("title").style.display = ""; refreshDeckSelects(); showDeckHero(); }
 $("openbuilder").onclick = openBuilder;
+$("fstats").onclick = openFriendStats;
 $("bclose").onclick = closeBuilder;
 $("bmore").onclick = () => { B.page++; renderGrid(false); };
 let fqTimer = 0;
