@@ -25,7 +25,9 @@
       this.heroes = this.G.P.map((p, i) => {
         const d = o.decks[i]; if (d && d.hero && p.decklist[d.hero]) return d.hero;     // หัวหน้าที่ผู้เล่นเลือกเอง
         const ids = Object.keys(p.decklist), cs = ids.map((id) => all.find((c) => c.id === id)).filter(Boolean);
-        const lead = cs.filter((c) => c.leader).sort((a, b) => b.cost - a.cost)[0]; if (lead) return lead.id;
+        // หัวหน้าของสายเดคก่อน (เดคผสมคู่หู เช่น นักฝึกสัตว์+สัตว์ใหญ่ มีหัวหน้า 2 ตัว) แล้วค่อย cost สูงสุด
+        const own = (c) => (c.archs && c.archs.has ? c.archs.has(this.deckNames[i]) : false);
+        const lead = cs.filter((c) => c.leader).sort((a, b) => own(b) - own(a) || b.cost - a.cost)[0]; if (lead) return lead.id;
         const race = {}; for (const c of cs) if (c.type === "มอน") race[c.id.slice(0, 3)] = (race[c.id.slice(0, 3)] || 0) + 1;
         const top = Object.entries(race).sort((a, b) => b[1] - a[1])[0];
         return top ? `${top[0]}-GEN-01` : cs[0].id;
