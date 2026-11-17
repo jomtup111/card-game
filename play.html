@@ -210,6 +210,12 @@
   .fly { position: fixed; z-index: 31; pointer-events: none; width: 46px; height: 69px; image-rendering: pixelated; }
   .fly.card { width: auto; height: auto; }
   .pfx { position: absolute; image-rendering: pixelated; pointer-events: none; }
+  .clash { position: absolute; font-family: "Press Start 2P"; font-size: 22px; pointer-events: none; transform: translate(-50%, -50%); color: #fff;
+    text-shadow: 3px 0 #1b1630, -3px 0 #1b1630, 0 3px #1b1630, 0 -3px #1b1630; animation: clash .75s ease-out forwards; }
+  .clash.atk { color: var(--hi); } .clash.heavy { font-size: 30px; }
+  @keyframes clash { 0% { transform: translate(-50%, -50%) scale(.3); opacity: 0; } 25% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; } 70% { transform: translate(-50%, -60%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -90%) scale(.9); opacity: 0; } }
+  .shard { position: absolute; pointer-events: none; image-rendering: pixelated; }
+  .pdot { position: absolute; width: 6px; height: 6px; pointer-events: none; box-shadow: 0 0 0 1px #1b163080; }
   .powpop { position: absolute; font-family: "Press Start 2P"; font-size: 24px; pointer-events: none; animation: powpop .9s ease-out forwards; }
   @keyframes powpop { 0% { transform: translate(-50%, 0) scale(.5); opacity: 0; } 25% { transform: translate(-50%, -14px) scale(1.3); opacity: 1; } 100% { transform: translate(-50%, -46px) scale(1); opacity: 0; } }
   .leader-scene { position: fixed; inset: 0; z-index: 27; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none;
@@ -952,7 +958,9 @@ function applyView(v) {
   if (!FAST && prev) {
     const now = new Set([...V.me.field, ...V.opp.field].map((x) => String(x.uid)));
     let died = 0, entered = 0;
-    for (const [uid, [r, el]] of Object.entries(rects)) if (!now.has(uid)) { dieFx(r, el); died++; }     // ตาย / ออกจากสนาม
+    // ออกจากสนาม: ถ้ามือ/เดคฝั่งนั้นโตขึ้น = ถูกส่งกลับ (ควันเดิม) · ไม่งั้น = ตายจริง (แตกเป็นเสี่ยง)
+    const back = { me: V.me.hand.length > prev.me.hand.length || V.me.deck > prev.me.deck, opp: V.opp.handCount > prev.opp.handCount || V.opp.deck > prev.opp.deck };
+    for (const [uid, [r, el]] of Object.entries(rects)) if (!now.has(uid)) { (back[el.closest("#mfield") ? "me" : "opp"] ? dieFx : shatterFx)(r, el); died++; }
     for (const el of document.querySelectorAll(".field .card[data-uid]")) if (!rects[el.dataset.uid]) { el.classList.add("enter"); entered++; }   // ลงสนาม
     if (died) SFX.play("die"); else if (entered) SFX.play("summon");
     for (const [side, id] of [["me", "mhp"], ["opp", "ehp"]]) {
@@ -984,6 +992,7 @@ const SFX = (() => {
   const S = {
     summon: () => [523, 659, 784].forEach((f, i) => tone(f, 0.09, { delay: i * 0.06 })),
     attack: () => { noise(0.14, { vol: 0.08, hp: 400 }); tone(260, 0.16, { type: "sawtooth", slide: 0.4, vol: 0.05 }); },
+    heavy: () => { tone(70, 0.35, { type: "sine", slide: 0.5, vol: 0.22 }); noise(0.2, { vol: 0.12, hp: 200 }); },
     hit: () => { noise(0.09, { vol: 0.14, hp: 1800 }); tone(110, 0.1, { vol: 0.08 }); },
     die: () => { tone(330, 0.38, { type: "triangle", slide: 0.22, vol: 0.1 }); noise(0.25, { vol: 0.05, hp: 3000, delay: 0.05 }); },
     cast: () => [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.13, { type: "triangle", delay: i * 0.05, vol: 0.07 })),
@@ -1064,6 +1073,37 @@ function dieFx(r, el) {
   const g = el.cloneNode(true); g.className = "card ghost"; g.style.left = r.left + "px"; g.style.top = r.top + "px"; g.style.margin = 0;
   fxLayer.appendChild(g); setTimeout(() => g.remove(), 560); sprite("img/ui_puff.png", "puff", center(r), 600);
 }
+// สีประจำเผ่า (อนุภาคเวท / ฉากหัวหน้า)
+const RACEFX = { human: ["#6fb7ff", "#fff6e0"], hell: ["#e2585e", "#f39a3b"], heaven: ["#ffd85a", "#fff6e0"], spirit: ["#8ccf63", "#b27ce0"], beast: ["#c98a2a", "#f39a3b"],
+  dino: ["#8ccf63", "#4c8a44"], machine: ["#c2c3d6", "#6fb7ff"], dragon: ["#e2585e", "#ffd85a"], fish: ["#4fc7b0", "#6fb7ff"], neutral: ["#c2c3d6", "#fff6e0"] };
+// อนุภาคสี่เหลี่ยมสีล้วน (เบากว่ารูป: ขยับแค่ transform/opacity)
+function dots([x, y], cols, n = 12, spread = 70, ms = 700) {
+  for (let k = 0; k < Math.min(n, 14); k++) {
+    const d = document.createElement("div"); d.className = "pdot"; d.style.background = cols[k % cols.length]; d.style.left = x - 3 + "px"; d.style.top = y - 3 + "px"; fxLayer.appendChild(d);
+    const a = Math.random() * Math.PI * 2, r = spread * (0.4 + Math.random() * 0.8);
+    d.animate([{ transform: "translate(0,0) scale(1.4)", opacity: 1 }, { transform: `translate(${Math.cos(a) * r}px, ${Math.sin(a) * r - 10}px) scale(.4)`, opacity: 0 }], { duration: ms * (0.7 + Math.random() * 0.5), easing: "cubic-bezier(.2,.7,.4,1)", fill: "forwards" });
+    setTimeout(() => d.remove(), ms * 1.3);
+  }
+}
+// การ์ดแตกเป็นเสี่ยง (ตายจริง) — ตัดภาพการ์ดเป็น 6 ชิ้นด้วย clip-path แล้วกระจาย
+function shatterFx(r, el) {
+  const P = [[0, 0, 50, 0, 40, 35, 0, 45], [50, 0, 100, 0, 100, 40, 40, 35], [0, 45, 40, 35, 55, 65, 0, 70], [40, 35, 100, 40, 100, 70, 55, 65], [0, 70, 55, 65, 45, 100, 0, 100], [55, 65, 100, 70, 100, 100, 45, 100]];
+  P.forEach((p, k) => {
+    const g = el.cloneNode(true); g.className = el.className.replace(/\b(ready|sel|enter|tgt|hl)\b/g, "") + " shard"; g.style.left = r.left + "px"; g.style.top = r.top + "px"; g.style.width = r.width + "px"; g.style.height = r.height + "px"; g.style.margin = 0;
+    g.style.clipPath = `polygon(${[0, 2, 4, 6].map((i) => `${p[i]}% ${p[i + 1]}%`).join(",")})`; fxLayer.appendChild(g);
+    const dx = (p[0] + p[2] + p[4] + p[6]) / 4 - 50, dy = (p[1] + p[3] + p[5] + p[7]) / 4 - 50;
+    g.animate([{ transform: "translate(0,0) rotate(0)", opacity: 1 }, { transform: `translate(${dx * 1.6}px, ${dy * 1.2 + 40}px) rotate(${dx * 0.8}deg)`, opacity: 0 }], { duration: 650 + k * 30, easing: "cubic-bezier(.3,.6,.5,1)", fill: "forwards" });
+    setTimeout(() => g.remove(), 760 + k * 30);
+  });
+  dots(center(r), ["#fff6e0", "#c2c3d6"], 10, 60, 600);
+}
+// ตัวเลข power ปะทะกันตอนโจมตี
+function clashNum(el, n, cls) {
+  if (!el || n == null) return; const r = rectOf(el), d = document.createElement("div"); d.className = "clash " + cls; d.textContent = n;
+  d.style.left = r.left + r.width / 2 + "px"; d.style.top = r.top + r.height * 0.4 + "px"; fxLayer.appendChild(d); setTimeout(() => d.remove(), 800);
+}
+const viewUnit = (uid) => V && [...V.me.field, ...V.opp.field].find((x) => x.uid === uid);
+function heavyHit(t) { $("app").classList.remove("quake"); void $("app").offsetWidth; $("app").classList.add("quake"); SFX.play("heavy"); dots(center(rectOf(t)), ["#ffd85a", "#f39a3b", "#fff6e0"], 14, 90, 650); }
 function banner(t) { const b = document.createElement("div"); b.className = "banner px-text"; b.textContent = t; document.body.appendChild(b); setTimeout(() => b.remove(), 1100); }
 // ตำแหน่งบนจอ
 const unitEl = (uid) => document.querySelector(`.field .card[data-uid="${uid}"]`);
@@ -1163,14 +1203,20 @@ async function playFx(e, v) {
     const a = unitEl(e.a); if (!a) return;
     const mine = a.parentElement.id === "mfield";
     const t = e.b === "face" ? $(mine ? "ehp" : "mhp") : unitEl(e.b); if (!t) return;
-    SFX.play("attack"); lunge(a, t); await sleep(290); impact(t); await sleep(300);
+    const ua = viewUnit(e.a), ub = e.b === "face" ? null : viewUnit(e.b), ap = ua ? ua.power : null, heavy = ap >= 6;
+    SFX.play("attack"); lunge(a, t); await sleep(290); impact(t);
+    clashNum(a, ap, "atk" + (heavy ? " heavy" : "")); if (ub) clashNum(t, ub.power, "");
+    if (heavy) heavyHit(t); await sleep(heavy ? 420 : 320);
   } else if (e.t === "gang") {                                         // รุมตี: พุ่งพร้อมกันทุกตัว
     const as = e.as.map(unitEl).filter(Boolean), t = unitEl(e.b); if (!as.length || !t) return;
     SFX.play("attack"); as.forEach((a, k) => setTimeout(() => lunge(a, t), k * 70)); await sleep(290 + as.length * 70);
-    impact(t); burst("img/ui_star.png", center(rectOf(t)), 10, 70); await sleep(350);
+    const sum = e.as.reduce((n, uid) => n + ((viewUnit(uid) || {}).power || 0), 0), ub = viewUnit(e.b);
+    impact(t); burst("img/ui_star.png", center(rectOf(t)), 10, 70); clashNum(as[0], sum, "atk" + (sum >= 6 ? " heavy" : "")); if (ub) clashNum(t, ub.power, "");
+    if (sum >= 6) heavyHit(t); await sleep(sum >= 6 ? 450 : 380);
   } else if (e.t === "cast" || e.t === "react") {
     const who = e.by === v.seat ? "คุณ" : v.opp.name;
     SFX.play(e.t === "cast" ? "cast" : "react");
+    { const h = $(mineSeat(e.by, v) ? "mface" : "eface"); if (h) dots(center(rectOf(h)), RACEFX[(ROW[e.id] || {}).race] || RACEFX.neutral, 14, 80, 800); }
     await showPlayed(e.id, `${who} ${e.t === "cast" ? "ร่ายเวท" : "ใช้เวทสวน!"}`, !mineSeat(e.by, v));
   } else if (e.t === "summon") {                                       // การ์ดบินจากมือลงสนาม (+ ฉากเปิดตัวหัวหน้า)
     const mine = mineSeat(e.by, v), from = mine ? document.querySelector(`#mhand .card[data-id="${e.id}"]`) || $("mhand") : $("ehand");
@@ -1814,6 +1860,9 @@ function netWait(text) {
   m.querySelector("#netwaittext").textContent = text;
 }
 const netWaitOff = () => { const m = document.getElementById("netwait"); if (m) m.remove(); };
+// เซิร์ฟเวอร์ส่งต่อ (TURN): ใช้เมื่อสองเครื่องต่อตรงไม่ติด (เน็ตมือถือ / Wi-Fi องค์กร) · build.py ใส่จาก web/turn.json (ไม่มีไฟล์ = ต่อตรงอย่างเดียว)
+const TURN = [];
+const PEEROPT = TURN.length ? { config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, ...TURN] } } : {};
 function heartbeat(c) {
   clearInterval(NET.hb); NET.lastSeen = Date.now();
   NET.hb = setInterval(() => {
@@ -1829,7 +1878,7 @@ async function hostRoom() {
   try { await loadPeer(); } catch (e) { peer = null; return netmsg(esc(e.message)); }
   const code = newCode();
   netmsg("กำลังสร้างห้อง…");
-  peer = new Peer(PREFIX + code);
+  peer = new Peer(PREFIX + code, PEEROPT);
   peer.on("open", () => {
     const link = `${location.origin}${location.pathname}?room=${code}`;
     if (location.hash === "#nethost") parent.postMessage({ code }, "*");
@@ -1889,7 +1938,7 @@ async function joinRoom(code) {
   NET.code = code; NET.token = saved && saved.code === code ? saved.token : Math.random().toString(36).slice(2) + Date.now().toString(36);
   sstore.set("room", JSON.stringify({ code, token: NET.token }));
   netmsg("กำลังเข้าห้อง…");
-  peer = new Peer();
+  peer = new Peer(PEEROPT);
   peer.on("error", (e) => { if (!conn && !V) netmsg(e.type === "peer-unavailable" ? "ไม่พบห้องนี้ (รหัสผิด หรือเจ้าของห้องปิดไปแล้ว)" : `เชื่อมต่อไม่ได้: ${esc(e.type)}`); });
   peer.on("disconnected", () => { try { peer.reconnect(); } catch {} });
   peer.on("open", guestConnect);
@@ -1933,7 +1982,7 @@ function guestLost() {
   if (V) netWait(`กำลังต่อห้องใหม่… (ครั้งที่ ${NET.retry})`);
   setTimeout(() => {
     if (conn) return;
-    if (peer.destroyed) { peer = new Peer(); peer.on("open", guestConnect); peer.on("disconnected", () => { try { peer.reconnect(); } catch {} }); }
+    if (peer.destroyed) { peer = new Peer(PEEROPT); peer.on("open", guestConnect); peer.on("disconnected", () => { try { peer.reconnect(); } catch {} }); }
     else { if (peer.disconnected) try { peer.reconnect(); } catch {} guestConnect(); }
     setTimeout(() => { if (conn && !conn.open) { const c = conn; conn = null; try { c.close(); } catch {} guestLost(); } }, 6000);   // ต่อไม่ติดใน 6 วิ → ลองใหม่
   }, 3000);
