@@ -20,7 +20,8 @@
       this.G.P.forEach((p, i) => (p.name = o.names[i]));
       // พระเอกของแต่ละฝั่ง (รูปกลางจอ): หัวหน้าที่ cost สูงสุดในเดค ไม่มีก็พลทหารของเผ่าที่มีมากสุด
       const all = o.cards;
-      this.heroes = this.G.P.map((p) => {
+      this.heroes = this.G.P.map((p, i) => {
+        const d = o.decks[i]; if (d && d.hero && p.decklist[d.hero]) return d.hero;     // หัวหน้าที่ผู้เล่นเลือกเอง
         const ids = Object.keys(p.decklist), cs = ids.map((id) => all.find((c) => c.id === id)).filter(Boolean);
         const lead = cs.filter((c) => c.leader).sort((a, b) => b.cost - a.cost)[0]; if (lead) return lead.id;
         const race = {}; for (const c of cs) if (c.type === "มอน") race[c.id.slice(0, 3)] = (race[c.id.slice(0, 3)] || 0) + 1;

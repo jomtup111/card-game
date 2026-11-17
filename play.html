@@ -124,6 +124,48 @@
   #bmsg { min-height: 20px; color: var(--hi); font-size: 13px; text-align: center; }
   #bmsg.err { color: #ff9aa6; }
   #bdecktoggle { display: none; }
+  /* ===== หน้าจัดเดคใหม่ ===== */
+  .bfilters #bclose { flex: none; }
+  .racetabs, .costtabs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .racetabs button { width: 56px; height: 54px; min-height: 0; padding: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10.5px; line-height: 1.1; }
+  .racetabs button img { width: 34px; image-rendering: pixelated; }
+  .racetabs button.all { font-size: 13px; }
+  .racetabs button.on, .costtabs button.on { border-image-source: url(img/ui_btn_gold.png); color: #1b1630; transform: translateY(-2px); }
+  .costtabs button { width: 40px; height: 40px; min-height: 0; padding: 0; font-family: "Press Start 2P"; font-size: 11px; justify-content: center; }
+  #bgrid .card { --s: var(--bs, 1.7); }
+  #bgrid .card:hover { z-index: 2; transform: translateY(-6px) scale(1.04); }
+  .dhead { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .dheroimg { width: 74px; height: 74px; min-height: 0; padding: 0; flex: none; position: relative; background: #2a2244; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
+  .dheroimg img { width: 56px; image-rendering: pixelated; }
+  .dheroimg span { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; background: #1b1630c0; }
+  .dheadr { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .dprog { position: relative; height: 22px; background: #1b1630; box-shadow: 0 0 0 2px #0008; margin: 2px 0 8px; }
+  .dbar { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(#e0b040, #a87020); transition: width .2s; }
+  .dbar.full { background: linear-gradient(#7ae09a, #3a9a5a); }
+  .dprog span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: "Press Start 2P"; font-size: 11px; color: #fff; text-shadow: 0 2px 0 #1b1630; }
+  #dcount.ok { color: #fff; }
+  .dcurve { display: flex; gap: 4px; align-items: flex-end; height: 64px; padding: 0 2px; margin-bottom: 4px; }
+  .dcurve div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; font-size: 10px; color: var(--dim); }
+  .dcurve i { display: block; width: 100%; background: linear-gradient(#ffd860, #c88e2a); box-shadow: 0 0 0 1px #1b1630; min-height: 2px; transition: height .2s; }
+  .dcurve b { font-family: "Press Start 2P"; font-size: 8px; color: var(--fg); margin-bottom: 2px; }
+  /* แถบการ์ดในเดค: สีเผ่า + รูปจาง ๆ ทางขวา */
+  .drow { position: relative; height: 32px; padding: 0 8px 0 4px; margin: 3px 0; overflow: hidden; background: linear-gradient(90deg, var(--rc) 0%, #2a2244 70%) !important;
+          box-shadow: 0 0 0 2px #1b1630, inset 0 2px 0 #ffffff22; transition: transform .1s; }
+  .drow:hover { transform: translateX(-4px); }
+  .drow .dthumb { position: absolute; right: 26px; top: -18px; width: 64px; height: 64px; image-rendering: pixelated; opacity: .55; pointer-events: none;
+                  -webkit-mask-image: linear-gradient(90deg, transparent, #000 50%); mask-image: linear-gradient(90deg, transparent, #000 50%); }
+  .drow .dn { position: relative; font-weight: 600; text-shadow: 0 1px 0 #1b1630, 0 0 4px #1b1630; color: #fff; }
+  .drow .dk { position: relative; min-width: 26px; text-align: center; background: #1b1630d0; padding: 3px 4px; }
+  .drow .dz { position: relative; min-height: 0; width: 24px; height: 24px; padding: 0; font-size: 12px; }
+  .drow.pop { animation: rowpop .3s; }
+  @keyframes rowpop { 0% { transform: translateX(-12px); filter: brightness(1.8); } }
+  .flyto { position: fixed; z-index: 90; pointer-events: none; transition: transform .35s cubic-bezier(.5, 0, .7, .4), opacity .35s; }
+  .heropick { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-height: 50vh; overflow-y: auto; padding: 6px; }
+  .heropick button { width: 76px; height: 86px; min-height: 0; padding: 2px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; font-size: 10px; line-height: 1.1; }
+  .heropick button img { width: 52px; image-rendering: pixelated; }
+  .heropick button.on { border-image-source: url(img/ui_btn_gold.png); color: #1b1630; }
+  @media (max-width: 799px) { .racetabs, .costtabs { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; padding-bottom: 4px; } .racetabs button, .costtabs button { flex: none; }
+    .racetabs button { width: 44px; height: 46px; font-size: 9px; } .racetabs button img { width: 26px; } .costtabs button { width: 32px; height: 32px; font-size: 9px; } }
   .deckrow { display: flex; gap: 8px; align-items: center; } .deckrow select { flex: 1; min-width: 0; }
   @media (max-width: 799px) {
     #builder { grid-template-columns: 1fr; padding: 4px; }
@@ -557,17 +599,27 @@
 <div id="builder" hidden>
   <div class="bleft">
     <div class="bfilters panel">
-      <input id="fq" placeholder="ค้นหาชื่อ / สกิล">
-      <select id="frace"></select><select id="farch"></select><select id="ftype"></select><select id="fcost"></select>
-      <button id="bclose">กลับ</button>
+      <button id="bclose" title="กลับหน้าแรก">◀ กลับ</button>
+      <input id="fq" placeholder="🔍 ค้นหาชื่อ / สกิล">
+      <select id="farch"></select><select id="ftype"></select>
+      <select id="frace" hidden></select><select id="fcost" hidden></select>
     </div>
+    <div class="racetabs" id="racetabs"></div>
+    <div class="costtabs" id="costtabs"></div>
     <div id="bgrid"></div>
     <button id="bmore">แสดงเพิ่ม</button>
   </div>
   <div id="bdeck" class="panel">
-    <h3><span>เดคของฉัน <span id="dcount"></span></span><button id="bdecktoggle">เปิด/ปิด</button></h3>
-    <label>เดคที่บันทึก <select id="dsaved"></select></label>
-    <label>ชื่อเดค <input id="dname" maxlength="24" placeholder="ตั้งชื่อเดค"></label>
+    <h3><span>เดคของฉัน</span><button id="bdecktoggle">เปิด/ปิด</button></h3>
+    <div class="dhead">
+      <button class="dheroimg" id="dheroimg" title="เลือกรูปหัวหน้าเดค"><img alt=""><span>เปลี่ยน</span></button>
+      <div class="dheadr">
+        <input id="dname" maxlength="24" placeholder="ตั้งชื่อเดค">
+        <select id="dsaved"></select>
+      </div>
+    </div>
+    <div class="dprog"><div class="dbar" id="dbar"></div><span id="dcount"></span></div>
+    <div class="dcurve" id="dcurve"></div>
     <div id="dstats"></div>
     <div id="bmsg"></div>
     <div id="dlist"></div>
@@ -1301,7 +1353,7 @@ function deckSpec(v) {
   if (!v) return { arch: ARCHS[Math.floor(Math.random() * ARCHS.length)][0] };
   if (v.startsWith("a:")) return { arch: v.slice(2) };
   const d = loadDecks()[+v.slice(2)]; if (!d) return "ไม่พบเดคนี้";
-  const err = Engine.validateDeck(ALL, d.ids); return err ? `เดค "${d.name}" ยังใช้ไม่ได้: ${err}` : { name: d.name, ids: d.ids };
+  const err = Engine.validateDeck(ALL, d.ids); return err ? `เดค "${d.name}" ยังใช้ไม่ได้: ${err}` : { name: d.name, ids: d.ids, hero: d.hero && d.ids.includes(d.hero) ? d.hero : undefined };
 }
 refreshDeckSelects();
 $("mascots").innerHTML = MASCOTS.map((m, i) => `<img src="img/${m}.png" alt="" style="animation-delay:${-i * 0.25}s">`).join("");
@@ -1314,6 +1366,7 @@ for (const b of document.querySelectorAll("[data-panel]")) b.onclick = () => { f
 for (const b of document.querySelectorAll("[data-close]")) b.onclick = () => (b.closest(".subpanel").hidden = true);
 // รูปหัวหน้าของเดคที่เลือก (หัวหน้า cost สูงสุด ไม่มีก็พลทหารเผ่า)
 function deckHero(spec) {
+  if (spec && spec.hero) return spec.hero;
   const ids = typeof spec === "string" ? [] : spec.ids || ALL.filter((c) => c.archs.has(spec.arch)).map((c) => c.id);
   const cs = ids.map((id) => CARD[id]).filter(Boolean);
   const lead = cs.filter((c) => c.leader).sort((a, b) => b.cost - a.cost)[0];
@@ -1322,7 +1375,7 @@ function deckHero(spec) {
   const top = Object.entries(race).sort((a, b) => b[1] - a[1])[0]; return top ? `${top[0]}-GEN-01` : "HUM-GEN-01";
 }
 function showDeckHero() {
-  const spec = deckSpec($("mydeck").value), id = deckHero(spec), r = ROW[id];
+  const v = $("mydeck").value, raw = v.startsWith("d:") ? loadDecks()[+v.slice(2)] : null, spec = deckSpec(v), id = deckHero(raw ? { ids: raw.ids, hero: raw.hero } : spec), r = ROW[id];
   if (r && r.art) { $("deckheroimg").src = `img/${r.art}.png`; $("profimg").src = `img/${r.art}.png`; }
   $("deckheroname").textContent = r ? r.name : "";
   $("deckinfo").textContent = typeof spec === "string" ? spec : spec.ids ? `เดคที่จัดเอง · ${spec.ids.length} ใบ` : `จัดอัตโนมัติ · สาย${spec.arch}`;
@@ -1537,12 +1590,19 @@ const SORTED = [...CARDS].sort((a, b) => raceRank(a) - raceRank(b) || TYPEORDER[
 const bmsg = (t, err = false) => { $("bmsg").textContent = t; $("bmsg").className = err ? "err" : ""; };
 const inDeck = (id) => B.ids.filter((x) => x === id).length;
 const limitOf = (id) => (CARD[id].onlyone ? 1 : 4);
+function fillTabs() {
+  const races = [...$("frace").options].map((o) => o.value), icon = (r) => MASCOTS[RACEORDER.indexOf(r)];
+  $("racetabs").innerHTML = races.map((r) => `<button data-v="${esc(r)}" class="${r ? "" : "all"}${$("frace").value === r ? " on" : ""}" title="${esc(r || "ทุกเผ่า")}">${r ? (icon(r) ? `<img src="img/${icon(r)}.png" alt="">` : "") + esc(r) : "ทุก<br>เผ่า"}</button>`).join("");
+  $("costtabs").innerHTML = [...$("fcost").options].map((o) => `<button data-v="${o.value}" class="${$("fcost").value === o.value ? "on" : ""}" title="${esc(o.text)}">${o.value === "" ? "ทุก" : o.value === "10" ? "10+" : o.value}</button>`).join("");
+  for (const b of $("racetabs").querySelectorAll("button")) b.onclick = () => { $("frace").value = b.dataset.v; fillArch(); fillTabs(); renderGrid(true); };
+  for (const b of $("costtabs").querySelectorAll("button")) b.onclick = () => { $("fcost").value = $("fcost").value === b.dataset.v ? "" : b.dataset.v; fillTabs(); renderGrid(true); };
+}
 function fillFilters() {
   const races = [...new Set(CARDS.flatMap((r) => r.raceTh.split("+")))].sort((a, b) => (RACEORDER.indexOf(a) + 1 || 99) - (RACEORDER.indexOf(b) + 1 || 99));
   $("frace").innerHTML = `<option value="">ทุกเผ่า</option>` + races.map((r) => `<option>${esc(r)}</option>`).join("");
   $("ftype").innerHTML = `<option value="">ทุกชนิด</option><option value="มอน">มอนสเตอร์</option><option>เวทปกติ</option><option>เวทสวน</option>`;
   $("fcost").innerHTML = `<option value="">ทุก cost</option>` + Array.from({ length: 11 }, (_, i) => `<option value="${i}">cost ${i}${i === 10 ? "+" : ""}</option>`).join("");
-  fillArch();
+  fillArch(); fillTabs();
 }
 function fillArch() {
   const race = $("frace").value, v = $("farch").value;
@@ -1563,10 +1623,11 @@ function markCount(el, id) {
 }
 function renderGrid(reset) {
   if (reset) { B.page = 1; $("bgrid").scrollTop = 0; }
+  { const w = $("bgrid").clientWidth || innerWidth - 360, cols = Math.max(2, Math.round(w / 150)); $("builder").style.setProperty("--bs", Math.max(1.15, Math.min(2.2, (w - cols * 12) / cols / 64)).toFixed(2)); }
   const list = filtered(), grid = $("bgrid"); grid.innerHTML = "";
   for (const r of list.slice(0, B.page * PAGE)) {
     const el = cardEl(r, { cls: "click" }); el.dataset.id = r.id;
-    el.onclick = () => addCard(r.id); markCount(el, r.id); grid.appendChild(el);
+    el.onclick = () => { if (addCard(r.id) === true) flyToDeck(el, r.id); }; markCount(el, r.id); grid.appendChild(el);
   }
   if (!list.length) grid.innerHTML = `<p class="muted">ไม่พบการ์ดที่ตรงกับตัวกรอง</p>`;
   for (const el of grid.querySelectorAll(".card")) fitCard(el);
@@ -1577,13 +1638,26 @@ function refreshCounts(id) { for (const el of $("bgrid").querySelectorAll(`.card
 function addCard(id) {
   if (B.ids.length >= Engine.DECK) return bmsg(`เดคเต็ม ${Engine.DECK} ใบแล้ว`, true);
   if (inDeck(id) >= limitOf(id)) return bmsg(`${CARD[id].name} ใส่ได้ไม่เกิน ${limitOf(id)} ใบ`, true);
-  B.ids.push(id); bmsg(`+ ${CARD[id].name}`); refreshCounts(id); renderDeck();
+  B.ids.push(id); bmsg(`+ ${CARD[id].name}`); refreshCounts(id); renderDeck(id); SFX.play("click"); return true;
 }
-function removeCard(id) { const i = B.ids.lastIndexOf(id); if (i >= 0) B.ids.splice(i, 1); bmsg(`− ${CARD[id].name}`); refreshCounts(id); renderDeck(); }
+// การ์ดบินจากตารางเข้าแถบในเดค
+function flyToDeck(el, id) {
+  const row = $("dlist").querySelector(`.drow[data-id="${id}"]`), to = (row || $("dlist")).getBoundingClientRect(), r = el.getBoundingClientRect();
+  if (!to.width || getComputedStyle($("bdeck")).transform !== "none" && innerWidth < 800) return;
+  const g = el.cloneNode(true); g.classList.add("flyto"); g.style.left = r.left + "px"; g.style.top = r.top + "px"; g.style.width = r.width + "px"; g.style.height = r.height + "px"; g.style.margin = 0;
+  document.body.appendChild(g);
+  requestAnimationFrame(() => { g.style.transform = `translate(${to.left + to.width / 2 - r.left - r.width / 2}px, ${to.top + to.height / 2 - r.top - r.height / 2}px) scale(.2)`; g.style.opacity = ".3"; });
+  setTimeout(() => g.remove(), 380);
+}
+function removeCard(id) { const i = B.ids.lastIndexOf(id); if (i >= 0) B.ids.splice(i, 1); bmsg(`− ${CARD[id].name}`); refreshCounts(id); renderDeck(); SFX.play("click"); }
 function zoomCard(r) { const z = document.createElement("div"); z.className = "zoom"; z.appendChild(cardEl(r)); z.onclick = () => z.remove(); document.body.appendChild(z); }
-function renderDeck() {
+function renderDeck(popId) {
   const n = B.ids.length, cs = B.ids.map((id) => CARD[id]);
   $("dcount").textContent = `${n}/${Engine.DECK}`; $("dcount").className = n === Engine.DECK ? "ok" : "";
+  $("dbar").style.width = `${Math.min(100, (n / Engine.DECK) * 100)}%`; $("dbar").classList.toggle("full", n === Engine.DECK);
+  { const bins = Array(8).fill(0); for (const c of cs) if (c.type === "มอน") bins[Math.min(7, c.cost)]++; const mx = Math.max(4, ...bins);
+    $("dcurve").innerHTML = bins.map((v, i) => `<div title="มอน cost ${i}${i === 7 ? "+" : ""}: ${v} ใบ"><b>${v || ""}</b><i style="height:${(v / mx) * 70}%"></i>${i}${i === 7 ? "+" : ""}</div>`).join(""); }
+  { const h = B.hero && B.ids.includes(B.hero) ? B.hero : deckHero({ ids: B.ids }), r = ROW[h]; const im = $("dheroimg").querySelector("img"); if (r && r.art) im.src = `img/${r.art}.png`; }
   $("bdecktoggle").textContent = `${n}/${Engine.DECK}`;
   const mons = cs.filter((c) => c.type === "มอน");
   $("dstats").textContent = n ? `มอน ${mons.length} · เวทปกติ ${cs.filter((c) => c.type === "เวทปกติ").length} · เวทสวน ${cs.filter((c) => c.type === "เวทสวน").length}` +
@@ -1591,13 +1665,12 @@ function renderDeck() {
   const uniq = [...new Set(B.ids)].map((id) => ROW[id]).sort((a, b) => TYPEORDER[a.type] - TYPEORDER[b.type] || (+a.cost || 0) - (+b.cost || 0) || a.name.localeCompare(b.name));
   $("dlist").innerHTML = "";
   for (const r of uniq) {
-    const row = document.createElement("div"); row.className = "drow";
-    row.innerHTML = `<span class="dc${r.type === "มอน" ? "" : " spell"}">${r.type === "มอน" ? r.cost : r.type === "เวทสวน" ? "สวน" : "เวท"}</span>
-      <span class="dn">${esc(r.name)}</span><span class="dk">×${inDeck(r.id)}</span><button title="เอาออก">−</button><button title="เพิ่ม">+</button>`;
-    const [minus, plus] = row.querySelectorAll("button");
-    minus.onclick = (e) => { e.stopPropagation(); removeCard(r.id); };
-    plus.onclick = (e) => { e.stopPropagation(); addCard(r.id); };
-    row.onclick = () => zoomCard(r);
+    const row = document.createElement("div"); row.className = "drow" + (r.id === popId ? " pop" : ""); row.dataset.id = r.id;
+    row.style.setProperty("--rc", (RACECOL[r.race] || "#8a7a6a") + "cc"); row.title = "แตะเพื่อเอาออก 1 ใบ";
+    row.innerHTML = `${r.art ? `<img class="dthumb" src="img/${r.art}.png" alt="">` : ""}<span class="dc${r.type === "มอน" ? "" : " spell"}">${r.type === "มอน" ? r.cost : r.type === "เวทสวน" ? "สวน" : "เวท"}</span>
+      <span class="dn">${esc(r.name)}</span><span class="dk">${inDeck(r.id) > 1 ? "×" + inDeck(r.id) : r.onlyone ? "★" : "×1"}</span><button class="dz" title="ดูการ์ด">🔍</button>`;
+    row.querySelector(".dz").onclick = (e) => { e.stopPropagation(); zoomCard(r); };
+    row.onclick = () => removeCard(r.id);
     $("dlist").appendChild(row);
   }
   $("ddelete").disabled = B.idx == null;
@@ -1608,7 +1681,7 @@ function fillSaved() {
 }
 function loadInto(idx) {
   const d = idx == null ? null : loadDecks()[idx];
-  Object.assign(B, d ? { name: d.name, ids: [...d.ids].filter((id) => CARD[id]), idx } : { name: "", ids: [], idx: null });
+  Object.assign(B, d ? { name: d.name, ids: [...d.ids].filter((id) => CARD[id]), idx, hero: d.hero || null } : { name: "", ids: [], idx: null, hero: null });
   $("dname").value = B.name; fillSaved(); renderDeck(); renderGrid(false); bmsg(d ? `เปิดเดค "${d.name}"` : "เดคใหม่");
 }
 function openBuilder() {
@@ -1629,7 +1702,7 @@ $("dname").oninput = () => (B.name = $("dname").value);
 $("bdecktoggle").onclick = () => $("bdeck").classList.toggle("open");
 $("dsave").onclick = () => {
   const decks = loadDecks(), name = $("dname").value.trim() || `เดคของฉัน ${decks.length + 1}`;
-  const d = { name, ids: [...B.ids] };
+  const d = { name, ids: [...B.ids] }; if (B.hero && B.ids.includes(B.hero)) d.hero = B.hero;
   if (B.idx == null) { decks.push(d); B.idx = decks.length - 1; } else decks[B.idx] = d;
   saveDecks(decks); B.name = name; $("dname").value = name; fillSaved(); refreshDeckSelects(); renderDeck();
   $("mydeck").value = `d:${B.idx}`; remember();
@@ -1637,6 +1710,16 @@ $("dsave").onclick = () => {
   bmsg(err ? `บันทึกแล้ว แต่ยังเล่นไม่ได้: ${err}` : `บันทึก "${name}" แล้ว · เลือกใช้ได้ที่หน้าแรก`, !!err);
 };
 $("dnew").onclick = () => loadInto(null);
+// เลือกรูปหัวหน้าเดค (มอนในเดค)
+$("dheroimg").onclick = () => {
+  const mons = [...new Set(B.ids)].map((id) => ROW[id]).filter((r) => r.type === "มอน" && r.art).sort((a, b) => (b.leader ? 1 : 0) - (a.leader ? 1 : 0) || +b.cost - +a.cost);
+  if (!mons.length) return bmsg("ใส่มอนสเตอร์ในเดคก่อน แล้วค่อยเลือกรูปหัวหน้า", true);
+  const cur = B.hero && B.ids.includes(B.hero) ? B.hero : deckHero({ ids: B.ids });
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="box panel"><h2 class="px-text">เลือกรูปหัวหน้าเดค</h2><p class="muted">รูปนี้จะเป็นพระเอกกลางโต๊ะตอนเล่น</p><div class="heropick">${mons.map((r) => `<button data-id="${r.id}" class="${r.id === cur ? "on" : ""}"><img src="img/${r.art}.png" alt="">${esc(r.name.split(" ")[0])}</button>`).join("")}</div><div class="btns"><button id="hpno">ปิด</button></div></div>`;
+  for (const b of m.querySelectorAll(".heropick button")) b.onclick = () => { B.hero = b.dataset.id; m.remove(); renderDeck(); bmsg(`หัวหน้าเดค: ${CARD[B.hero].name} (กดบันทึกเพื่อเก็บ)`); };
+  m.querySelector("#hpno").onclick = () => m.remove(); document.body.appendChild(m);
+};
 $("dfill").onclick = () => {
   const m = document.createElement("div"); m.className = "modal";
   m.innerHTML = `<div class="box panel"><h2 class="px-text">เริ่มจากสาย</h2><p class="muted">แทนที่เดคตอนนี้ด้วยเดค 50 ใบที่จัดอัตโนมัติจากสายนี้ แล้วค่อยแก้ต่อ</p>
