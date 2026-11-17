@@ -275,7 +275,8 @@
   .row.field { min-height: calc(50px * var(--ms) + 26px); border: none; background: none; padding: 0; gap: calc(6px * var(--ms)); }
   .row.field .slot { display: none; }
   #msg { min-height: 22px; }
-  .actionbar { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 0; flex-wrap: wrap; }
+  .actionbar { position: relative; z-index: 90; display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 0; flex-wrap: wrap; }   /* อยู่เหนือการ์ดในมือที่ยกขึ้น */
+  .actionbar #paybox:not(:empty) { background: #1b1630e8; padding: 4px 10px; box-shadow: 0 0 0 2px #e0b040; }
   .actionbar:empty { display: none; }
   /* มอนบนสนาม: กรอบเล็ก (รูป + power + สถานะ) */
   .card.minion { --s: var(--ms); width: calc(56px * var(--ms)); height: calc(50px * var(--ms)); background: none !important; filter: drop-shadow(0 4px 3px #000a); }
@@ -301,7 +302,7 @@
   .row.hand .card { position: absolute; bottom: calc(-96px * var(--hs) * .2); transform-origin: 50% 120%;
                     transform: translateY(var(--dy, 0)) rotate(var(--rot, 0deg)); transition: transform .15s, filter .15s; }
   .row.hand .card:hover, .row.hand .card.lift { transform: translateY(-38%) scale(1.22) rotate(0deg); z-index: 60; }
-  .row.hand .card.sel, .row.hand .card.fodder { transform: translateY(-22%) rotate(0deg); z-index: 55; }
+  .row.hand .card.sel, .row.hand .card.fodder { transform: translateY(-12%) rotate(0deg); z-index: 55; }
   .row.hand .card.dragging { opacity: .25; }
   .dragghost { position: fixed; z-index: 70; pointer-events: none; transform: translate(-50%, -60%) rotate(-4deg) scale(1.05); filter: drop-shadow(0 12px 10px #000c); }
   /* ปุ่มจบเทิร์น + เวลาเทิร์น */
@@ -1562,6 +1563,11 @@ if (location.hash === "#dragtest") {                                            
       }, 1500);
     }, 600);
   }, 2500);
+}
+if (location.hash === "#paytest") {                                                   // ทดสอบ: โหมดจ่าย gem (ปุ่มอัญเชิญต้องไม่ถูกการ์ดบัง)
+  $("go").click(); S.act(0, { t: "mull", idx: [] });
+  setTimeout(() => { const [A] = S.G.P; S.G.cur = 0; S.G.turn = 3; S.botDelay = 1e9; A.field.length = 0; A.hand = ["FIS-ANC-05", "FIS-GEN-01", "FIS-ANC-02", "FIS-ANC-12", "FIS-ANC-13", "NEU-SPL-16"].map((id) => CARD[id]); S.push();
+    setTimeout(() => clickHand(V.me.hand[0], 0), 400); }, 2500);
 }
 if (location.hash === "#practice") { $("practice").click(); }
 if (location.hash === "#builder") { openBuilder(); $("dfill").click(); document.querySelector("#fillok").click(); }   // ทดสอบหน้าจัดเดค
