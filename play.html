@@ -293,6 +293,13 @@
   .menu .wide { grid-column: 1 / -1; }
   .menu .help { font-size: 13px; color: var(--dim); line-height: 1.6; }
   .code { font-family: "Press Start 2P", monospace; font-size: 22px; color: var(--hi); letter-spacing: 4px; }
+  .share { display: flex; gap: 14px; align-items: center; justify-content: space-between; margin-top: 8px; flex-wrap: wrap; }
+  .sharel { flex: 1; min-width: 200px; }
+  .sharebtns { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 4px; } .sharebtns button, .sharebtns .btnlike { min-height: 36px; font-size: 14px; }
+  .btnlike { display: inline-flex; align-items: center; padding: 2px 14px; text-decoration: none; font-weight: 600; color: #fff; box-shadow: 0 0 0 2px #1b1630, 0 3px 0 #1b1630; }
+  .btnlike.line { background: #06c755; }
+  .qr { padding: 8px; background: #fff6e0; box-shadow: 0 0 0 3px #1b1630, 0 0 0 5px #e0b040; line-height: 0; }
+  .qr img, .qr canvas { image-rendering: pixelated; }
   #netmsg { margin-top: 8px; min-height: 20px; word-break: break-all; font-size: 13px; }
 
   /* ---------- กล่องอธิบายการ์ด (ชี้เมาส์ / กดค้าง) ---------- */
@@ -1726,6 +1733,21 @@ $("go").onclick = () => {
 
 // ---------------------------------------------------------------- ออนไลน์ (PeerJS: เชื่อมเครื่องตรงหากัน ไม่ต้องมีเซิร์ฟเวอร์ของเราเอง)
 const netmsg = (s) => ($("netmsg").innerHTML = s);
+// ชวนเพื่อน: รหัส + ปุ่มคัดลอกลิงก์ / แชร์ / LINE + QR code ให้สแกนจากมือถือ
+const QRLIB = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+function roomShareHtml(code, link) {
+  return `<div class="share"><div class="sharel">รหัสห้อง <span class="code">${code}</span>
+      <div class="sharebtns"><button id="shcopy">📋 คัดลอกลิงก์</button>${navigator.share ? `<button id="shshare">📤 แชร์</button>` : ""}<a class="btnlike line" id="shline" target="_blank" rel="noopener" href="https://line.me/R/msg/text/?${encodeURIComponent("มาเล่น Battle of Banmo กัน! กดลิงก์เข้าห้อง " + code + " : " + link)}">LINE</a></div>
+      <div class="muted" id="shmsg">ส่งลิงก์หรือให้เพื่อนสแกน QR · รอเพื่อนเข้าห้อง…</div></div>
+    <div class="qr" id="shqr" title="สแกนเพื่อเข้าห้อง"></div></div>`;
+}
+function wireRoomShare(code, link) {
+  const msg = (t) => { const m = $("shmsg"); if (m) m.textContent = t; };
+  const cp = $("shcopy"); if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(link); msg("คัดลอกลิงก์แล้ว ✓ วางส่งเพื่อนได้เลย"); } catch { prompt("คัดลอกลิงก์นี้", link); } };
+  const sh = $("shshare"); if (sh) sh.onclick = () => navigator.share({ title: "Battle of Banmo", text: `มาเล่นกัน! ห้อง ${code}`, url: link }).catch(() => {});
+  const draw = () => { const q = $("shqr"); if (!q || !window.QRCode) return; q.innerHTML = ""; new QRCode(q, { text: link, width: 132, height: 132, colorDark: "#1b1630", colorLight: "#fff6e0", correctLevel: QRCode.CorrectLevel.M }); };
+  if (window.QRCode) draw(); else { const sc = document.createElement("script"); sc.src = QRLIB; sc.onload = draw; sc.onerror = () => { const q = $("shqr"); if (q) q.remove(); }; document.head.appendChild(sc); }
+}
 function loadPeer() {
   if (window.Peer) return Promise.resolve();
   return new Promise((ok, bad) => { const s = document.createElement("script"); s.src = PEERJS; s.onload = ok; s.onerror = () => bad(new Error("โหลด PeerJS ไม่ได้ (ต้องต่อเน็ต)")); document.head.appendChild(s); });
@@ -1794,7 +1816,7 @@ async function hostRoom() {
   peer.on("open", () => {
     const link = `${location.origin}${location.pathname}?room=${code}`;
     if (location.hash === "#nethost") parent.postMessage({ code }, "*");
-    netmsg(`รหัสห้อง <span class="code">${code}</span><br>ส่งรหัสนี้ หรือลิงก์ <a href="${esc(link)}" style="color:var(--hi)">${esc(link)}</a> ให้เพื่อน · รอเพื่อนเข้าห้อง…`);
+    netmsg(roomShareHtml(code, link)); wireRoomShare(code, link);
   });
   peer.on("disconnected", () => { try { peer.reconnect(); } catch {} });   // เน็ตเจ้าของห้องหลุด: จองรหัสห้องเดิมกลับคืน
   peer.on("error", (e) => { if (e.type === "unavailable-id" && !S) { peer.destroy(); hostRoom(); } else if (!S) netmsg(`เชื่อมต่อไม่ได้: ${esc(e.type)}`); });
@@ -2198,7 +2220,8 @@ if (location.hash === "#dragtest") {                                            
     const [A, B] = S.G.P; S.G.cur = 0; S.G.turn = 3; S.botDelay = 1e9; A.field.length = B.field.length = 0;
     const u = new Engine.Unit(CARD["HUM-KNI-10"]); u.attacksLeft = 1; A.field.push(u); B.field.push(new Engine.Unit(CARD["HUM-GEN-01"]));
     A.hand = [CARD["NEU-SPL-16"], CARD["HUM-GEN-01"]]; S.push();
-    setTimeout(() => {
+    const go = () => {                                                  // รอจนอนิเมชันต้นเกมจบและการ์ดขึ้นสนามจริง
+      if (draining || $("mullscreen") || document.querySelector(".banner, .showcard") || !document.querySelector("#mfield .card") || !document.querySelector("#efield .card") || !document.querySelector('#mhand .card[data-id="NEU-SPL-16"]')) return setTimeout(go, 200);
       const fire = (type, el, x, y) => (el || window).dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, pointerType: "mouse", button: 0 }));
       const mine = document.querySelector("#mfield .card"), foe = document.querySelector("#efield .card");
       const a = mine.getBoundingClientRect(), b = foe.getBoundingClientRect();
@@ -2209,7 +2232,7 @@ if (location.hash === "#dragtest") {                                            
         fire("pointerdown", card, c.x + 30, c.y + 30); fire("pointermove", null, c.x + 30, c.y - 40); fire("pointermove", null, c.x + 30, c.y - 300); fire("pointerup", null, c.x + 30, c.y - 300);
         setTimeout(() => console.log("DRAG cast -> spellUsed " + S.G.P[0].spellUsed + " hand " + S.G.P[0].hand.length), 1500);
       }, 1500);
-    }, 600);
+    }; setTimeout(go, 600);
   }, 2500);
 }
 if (location.hash === "#endtest") {                                                    // ทดสอบ: หน้าจบเกม
