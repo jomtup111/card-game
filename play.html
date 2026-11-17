@@ -874,6 +874,9 @@ function longPress(el, fn) {
   el.addEventListener("click", (e) => { if (fired) { e.stopImmediatePropagation(); e.preventDefault(); fired = false; } }, true);
   el.addEventListener("contextmenu", (e) => e.preventDefault());
 }
+// ภาพเก่า 24×18 ขยายเป็นจำนวนเต็ม (×2) · ภาพใหม่ 32×24 ขยายเต็มกรอบ 54×43 แล้วปัดให้ 1 พิกเซลภาพ = จำนวนพิกเซลจอเต็ม ๆ (ไม่เบี้ยว)
+const artScale = (w, h) => (w >= 32 ? Math.min(54 / w, 43 / h) : Math.max(1, Math.floor(Math.min(54 / w, 43 / h))));
+const artPx = (u) => { const r = window.devicePixelRatio || 1; return Math.max(1, Math.round(u * r)) / r; };
 const IMGSIZE = {};                                                     // ขนาดรูปที่เคยโหลดแล้ว → ปรับขนาดได้ทันทีไม่ต้องรอโหลด
 function fitCard(el) {
   if (!el.isConnected) return;
@@ -882,8 +885,8 @@ function fitCard(el) {
   if (img && img.naturalWidth) IMGSIZE[img.getAttribute("src")] = [img.naturalWidth, img.naturalHeight];
   const dim = img && IMGSIZE[img.getAttribute("src")];
   if (dim) {
-    const [w, h] = dim, k = Math.max(1, Math.floor(Math.min(54 / w, 43 / h)));
-    img.style.width = w * k * S + "px"; img.style.height = h * k * S + "px";
+    const [w, h] = dim, k = artScale(w, h), p = artPx(k * S);
+    img.style.width = w * p + "px"; img.style.height = h * p + "px";
     img.style.marginBottom = Math.max(0, Math.min(3, 43 - h * k)) * S + "px";
   }
   for (const [sel, max] of [[".name", 4.2], [".type", 3], [".text", 3.2], [".badge:not(.power)", 3.2]])
