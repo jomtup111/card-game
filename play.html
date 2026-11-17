@@ -474,6 +474,14 @@
     #endturn { width: 64px; height: 64px; font-size: 12px; right: 8px; top: 50%; bottom: auto; transform: translateY(-50%); }
     .topbtns button { width: 34px; height: 30px; font-size: 14px; }
   }
+  /* ================= ตั้งค่า ================= */
+  .setbox { width: min(440px, 100%); }
+  .setbox .srow { display: flex; align-items: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+  .setbox .srow > span:first-child { flex: 0 0 170px; font-weight: 600; }
+  .setbox input[type=range] { flex: 1; accent-color: #e0b040; height: 28px; }
+  .setbox .seg { display: flex; gap: 6px; flex: 1; } .setbox .seg button { flex: 1; min-height: 40px; }
+  .setbox .seg button.on { border-image-source: url(img/ui_btn_gold.png); color: #1b1630; }
+  .setbox .sval { min-width: 44px; text-align: right; font-family: "Press Start 2P"; font-size: 11px; color: var(--hi); }
   /* ================= หน้า mulligan ================= */
   #mullscreen { position: fixed; inset: 0; z-index: 18; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 12px;
                 background: radial-gradient(ellipse at 50% 55%, #2a2244ee, #120e20f4 75%); animation: mullin .35s ease-out; }
@@ -528,7 +536,7 @@
 <div id="app">
   <div id="board">
     <div class="opphand" id="ehand" title="การ์ดในมือศัตรู"></div>
-    <div class="topbtns"><button id="logbtn" title="บันทึกเกม">📜</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button><button id="quitbtn" title="ออกจากเกม">⏏</button></div>
+    <div class="topbtns"><button id="logbtn" title="บันทึกเกม">📜</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button><button id="setbtn" title="ตั้งค่า">⚙</button><button id="quitbtn" title="ออกจากเกม">⏏</button></div>
     <div class="herorow opp">
       <div class="piles"><span class="pile" id="edeck"></span><span class="pile" id="egrave"></span><span class="muted" id="earch"></span></div>
       <div class="hero" id="eface"><div class="portrait"><img id="eheroimg" alt=""></div><div class="hpgem px-text" id="ehp"></div><div class="heroname px-text" id="ename"></div></div>
@@ -556,7 +564,7 @@
   <div class="tbar">
     <label class="profile panel"><img src="img/hum_hans.png" alt="" id="profimg"><span>ผู้เล่น</span><input id="myname" maxlength="16" placeholder="ตั้งชื่อ"></label>
     <span class="grow"></span>
-    <button id="soundtitle" title="เปิด/ปิดเสียง">🔊 เสียง</button>
+    <button id="soundtitle" title="เปิด/ปิดเสียง">🔊 เสียง</button><button id="settitle" title="ตั้งค่า">⚙ ตั้งค่า</button>
   </div>
   <div class="logo"><img src="img/ui_logo.png" alt=""><h1><span class="gname">Battle of Banmo</span><small>เกมการ์ด 9 เผ่า · ทิ้งการ์ดเป็น gem · อัญเชิญ · ตีให้ HP ศัตรูหมด</small></h1></div>
   <div class="mainmenu">
@@ -707,7 +715,10 @@ const MASCOTS = ["hum_hans", "hel_grib", "hea_luz", "spi_mushy", "bea_nutty", "d
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const u = (x, y, w, h, extra = "") => `style="--x:${x};--y:${y};--w:${w};--h:${h};${extra}"`;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const SET = (() => { let o = {}; try { o = JSON.parse(localStorage.getItem("settings") || "{}"); } catch {} return Object.assign({ vol: 70, speed: 1, hints: false, tips: true }, o); })();
+const BOTDELAY = 600;
+const saveSet = () => { try { localStorage.setItem("settings", JSON.stringify(SET)); } catch {} };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms * SET.speed));
 const abilityHtml = (t) => { let h = esc(t).replace(/; /g, "<br>"); for (const k of KW) h = h.split(k).join(`<span class="kw">${k}</span>`); return h; };
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 const FAST = location.hash === "#auto" || location.hash === "#nethost" || location.hash === "#netguest";   // ทดสอบ: ข้ามอนิเมชัน
@@ -766,7 +777,7 @@ function cardEl(v, o = {}) {
     if (e.pointerType !== "mouse") return;
     const p = $("preview"); p.innerHTML = "";
     if (el.closest("#board") && !el.closest("#mhand") && !document.querySelector(".dragghost")) { p.appendChild(big()); p.classList.add("on"); }
-    if (!el.closest(".zoom, .showcard")) showTip(el, v, o);
+    if (!el.closest(".zoom, .showcard") && SET.tips) showTip(el, v, o);
   });
   el.addEventListener("pointerleave", hideTip);
   longPress(el, () => {
@@ -873,19 +884,19 @@ function applyView(v) {
 
 // ---------------------------------------------------------------- เสียง (สังเคราะห์แบบชิปทูนด้วย Web Audio — ไม่ใช้ไฟล์)
 const SFX = (() => {
-  let ctx = null, on = store.get("sound") !== "off";
-  const ac = () => (ctx ||= new (window.AudioContext || window.webkitAudioContext)());
+  let ctx = null, master = null, on = store.get("sound") !== "off";
+  const ac = () => { if (!ctx) { ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = (SET.vol / 70) ** 1.5; master.connect(ctx.destination); } return ctx; };
   function tone(f, dur, { type = "square", vol = 0.07, slide = 0, delay = 0 } = {}) {
     const c = ac(), t = c.currentTime + delay, o = c.createOscillator(), g = c.createGain();
     o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f * slide), t + dur);
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+    o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.02);
   }
   function noise(dur, { vol = 0.1, delay = 0, hp = 900 } = {}) {
     const c = ac(), t = c.currentTime + delay, b = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate), d = b.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
     const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
-    src.buffer = b; f.type = "highpass"; f.frequency.value = hp; g.gain.value = vol; src.connect(f).connect(g).connect(c.destination); src.start(t);
+    src.buffer = b; f.type = "highpass"; f.frequency.value = hp; g.gain.value = vol; src.connect(f).connect(g).connect(master); src.start(t);
   }
   const S = {
     summon: () => [523, 659, 784].forEach((f, i) => tone(f, 0.09, { delay: i * 0.06 })),
@@ -905,6 +916,7 @@ const SFX = (() => {
     play(k) { if (!on || FAST) return; try { if (ac().state === "suspended") ctx.resume(); S[k] && S[k](); } catch {} },
     get on() { return on; },
     toggle() { on = !on; store.set("sound", on ? "on" : "off"); return on; },
+    setVol(v) { SET.vol = v; if (master) master.gain.value = (v / 70) ** 1.5; if (v > 0 && !on) this.toggle(); if (v === 0 && on) this.toggle(); },
   };
 })();
 function soundIcons() { $("soundbtn").textContent = SFX.on ? "🔊" : "🔇"; $("soundtitle").textContent = (SFX.on ? "🔊" : "🔇") + " เสียง"; }
@@ -1381,6 +1393,32 @@ function showDeckHero() {
   $("deckinfo").textContent = typeof spec === "string" ? spec : spec.ids ? `เดคที่จัดเอง · ${spec.ids.length} ใบ` : `จัดอัตโนมัติ · สาย${spec.arch}`;
 }
 $("mydeck").addEventListener("change", () => { showDeckHero(); remember(); });
+function openSettings() {
+  if (document.querySelector(".setbox")) return;
+  const m = document.createElement("div"); m.className = "modal";
+  const seg = (k, opts) => `<span class="seg">${opts.map(([v, t]) => `<button data-k="${k}" data-v="${v}" class="${SET[k] === v ? "on" : ""}">${t}</button>`).join("")}</span>`;
+  m.innerHTML = `<div class="box panel setbox"><h2 class="px-text">ตั้งค่า</h2>
+    <div class="srow"><span>ความดังเสียง</span><input type="range" id="svol" min="0" max="100" step="5" value="${SFX.on ? SET.vol : 0}"><span class="sval" id="svolv"></span></div>
+    <div class="srow"><span>ความเร็วอนิเมชัน</span>${seg("speed", [[1.4, "ช้า"], [1, "ปกติ"], [0.5, "เร็ว"]])}</div>
+    <div class="srow"><span>คำแนะนำในเกม</span>${seg("hints", [[true, "เปิด"], [false, "ปิด"]])}</div>
+    <div class="srow"><span>ชี้การ์ดแล้วบอกเอฟเฟกต์</span>${seg("tips", [[true, "เปิด"], [false, "ปิด"]])}</div>
+    <p class="muted" style="font-size:12.5px">คำแนะนำในเกม = เด้งบอกวิธีเล่นครั้งแรกที่เจอแต่ละสถานการณ์ (เหมือนโหมดฝึกเล่น) ใช้กับเกมกับบอท</p>
+    <div class="btns"><button class="main" id="setok">เสร็จ</button></div></div>`;
+  const vol = m.querySelector("#svol"), vv = m.querySelector("#svolv"), showV = () => (vv.textContent = vol.value);
+  showV(); vol.oninput = () => { SFX.setVol(+vol.value); showV(); soundIcons(); };
+  vol.onchange = () => { saveSet(); SFX.play("click"); };
+  for (const b of m.querySelectorAll(".seg button")) b.onclick = () => {
+    const k = b.dataset.k, v = b.dataset.v === "true" ? true : b.dataset.v === "false" ? false : +b.dataset.v;
+    SET[k] = v; saveSet(); SFX.play("click");
+    for (const x of m.querySelectorAll(`.seg button[data-k="${k}"]`)) x.classList.toggle("on", x === b);
+    if (k === "hints" && role === "bot") { HINTS = v; if (v) hints(); else { const h = document.querySelector(".hint"); if (h) h.remove(); } }
+    if (k === "speed" && S && role === "bot") S.botDelay = Math.round(BOTDELAY * v);
+  };
+  m.querySelector("#setok").onclick = () => m.remove();
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  document.body.appendChild(m);
+}
+$("setbtn").onclick = $("settitle").onclick = (e) => { e.stopPropagation(); openSettings(); };
 $("quitbtn").onclick = () => {
   const m = document.createElement("div"); m.className = "modal";
   m.innerHTML = `<div class="box panel" style="text-align:center"><h2 class="px-text">ออกจากเกม?</h2><p>${role === "host" || role === "guest" ? "จะออกจากห้อง และเกมนี้จะจบ" : "เกมนี้จะจบ และกลับไปหน้าแรก"}</p>
@@ -1392,8 +1430,8 @@ $("quitbtn").onclick = () => {
 $("go").onclick = () => {
   const mine = deckSpec($("mydeck").value), bot = deckSpec($("botdeck").value);
   if (typeof mine === "string" || typeof bot === "string") { $("deckinfo").textContent = typeof mine === "string" ? mine : bot; return; }
-  role = "bot"; remember();
-  newSession(["local", "bot"], [myName(), "บอท"], [mine, bot]);
+  role = "bot"; remember(); HINTS = SET.hints; hintSeen.clear();
+  newSession(["local", "bot"], [myName(), "บอท"], [mine, bot], { botDelay: Math.round(BOTDELAY * SET.speed) });
 };
 
 // ---------------------------------------------------------------- ออนไลน์ (PeerJS: เชื่อมเครื่องตรงหากัน ไม่ต้องมีเซิร์ฟเวอร์ของเราเอง)
@@ -1834,7 +1872,7 @@ function hints() {
 $("practice").onclick = () => {
   HINTS = true; hintSeen.clear(); role = "bot"; remember();
   const mine = deckSpec($("mydeck").value); if (typeof mine === "string") return netmsg(esc(mine));
-  newSession(["local", "bot"], [myName(), "บอท"], [mine, { arch: ARCHS[Math.floor(Math.random() * ARCHS.length)][0] }], { botDelay: 900 });
+  newSession(["local", "bot"], [myName(), "บอท"], [mine, { arch: ARCHS[Math.floor(Math.random() * ARCHS.length)][0] }], { botDelay: Math.round(900 * SET.speed) });
 };
 
 // ---------------------------------------------------------------- ทดสอบ
