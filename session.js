@@ -48,7 +48,8 @@
       };
       const unit = (owner, x, mine) => {
         const v = { uid: x.uid, id: x.card ? x.card.id : null, tok: x.card ? null : { name: x.name, kinds: [...x.kinds], power: x.power },
-          power: mine && my ? G.eff(owner, x, true) : G.eff(owner, x), status: status(x), atkErr: "ยังไม่ใช่ตาคุณ", targets: [], pred: {} };
+          power: mine && my ? G.eff(owner, x, true) : G.eff(owner, x), status: status(x), atkErr: "ยังไม่ใช่ตาคุณ", targets: [], pred: {},
+          kws: [...new Set([...Object.keys(x.kw), ...Object.keys(x.akw)])].filter((k) => x.has(k) && !["spellproof", "revealed"].includes(k)), armor: G.arm(x) };
         if (mine && my) {
           const ts = G.canAttack(p, x) ? [] : G.targets(p, x);
           v.atkErr = G.canAttack(p, x) || (ts.length ? null : "ไม่มีเป้าหมายที่ตีได้");
