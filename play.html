@@ -218,11 +218,24 @@
   .pdot { position: absolute; width: 6px; height: 6px; pointer-events: none; box-shadow: 0 0 0 1px #1b163080; }
   .powpop { position: absolute; font-family: "Press Start 2P"; font-size: 24px; pointer-events: none; animation: powpop .9s ease-out forwards; }
   @keyframes powpop { 0% { transform: translate(-50%, 0) scale(.5); opacity: 0; } 25% { transform: translate(-50%, -14px) scale(1.3); opacity: 1; } 100% { transform: translate(-50%, -46px) scale(1); opacity: 0; } }
-  .leader-scene { position: fixed; inset: 0; z-index: 27; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none;
-                  background: radial-gradient(circle, #fff8 0%, #ffd86055 25%, #1b1630e0 70%); animation: leader 1.5s ease-out forwards; }
-  .leader-scene .card { --s: 3.6; animation: leadercard 1.5s cubic-bezier(.2, 1.3, .4, 1) forwards; }
-  .leader-scene b { font-size: 30px; color: var(--hi); }
-  @keyframes leader { 0% { opacity: 0; } 10% { opacity: 1; background-color: #fff; } 80% { opacity: 1; } 100% { opacity: 0; } }
+  .leader-scene { position: fixed; inset: 0; z-index: 27; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; overflow: hidden;
+                  background: radial-gradient(circle, var(--lc2) 0%, #1b1630d0 45%, #0d0a18f0 80%); animation: leader var(--ld, 2.2s) ease-out forwards; }
+  .leader-scene .rays { position: absolute; left: 50%; top: 50%; width: 160vmax; height: 160vmax; margin: -80vmax 0 0 -80vmax; pointer-events: none; opacity: .5;
+                  background: repeating-conic-gradient(var(--lc) 0deg 7deg, transparent 7deg 22deg); animation: rays 6s linear infinite; image-rendering: pixelated; }
+  .leader-scene .card { --s: 3.6; position: relative; animation: leadercard var(--ld, 2.2s) cubic-bezier(.2, 1.3, .4, 1) forwards; filter: drop-shadow(0 0 18px var(--lc)); }
+  .leader-scene b { position: relative; font-size: 30px; color: var(--hi); text-shadow: 3px 3px 0 #1b1630; }
+  .leader-scene .lname { position: relative; font-family: "Press Start 2P", sans-serif; font-size: 14px; color: #fff; background: #1b1630c0; padding: 6px 14px; border: 2px solid var(--lc); }
+  .leader-scene .skip { position: absolute; bottom: 18px; font-size: 12px; color: #fff8; }
+  @keyframes rays { to { transform: rotate(360deg); } }
+  @keyframes leader { 0% { opacity: 0; } 8% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+  #splash { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #0d0a18; cursor: pointer; transition: opacity .5s; }
+  #splash img { width: min(42vw, 220px); image-rendering: pixelated; animation: splashlogo 1.4s cubic-bezier(.2, 1.4, .4, 1) both; }
+  #splash .gname { font-family: "Press Start 2P", sans-serif; font-size: clamp(18px, 4vw, 34px); color: var(--hi); text-shadow: 4px 4px 0 #3a2f4a; animation: splashtxt 1.2s .5s both; }
+  #splash .tap { font-size: 14px; color: #fff9; animation: blink 1.2s 1.4s infinite both; }
+  #splash.out { opacity: 0; pointer-events: none; }
+  @keyframes splashlogo { 0% { transform: scale(.2) translateY(60px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  @keyframes splashtxt { 0% { opacity: 0; transform: translateY(14px); } 100% { opacity: 1; transform: none; } }
+  @keyframes blink { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
   @keyframes leadercard { 0% { transform: scale(.2) rotate(-20deg); } 40% { transform: scale(1.1) rotate(3deg); } 60%, 100% { transform: scale(1) rotate(0); } }
   .endfade { position: fixed; inset: 0; z-index: 19; background: #000; pointer-events: none; animation: endfade 1.2s forwards; }
   @keyframes endfade { to { opacity: .65; } }
@@ -962,7 +975,11 @@ function applyView(v) {
     const back = { me: V.me.hand.length > prev.me.hand.length || V.me.deck > prev.me.deck, opp: V.opp.handCount > prev.opp.handCount || V.opp.deck > prev.opp.deck };
     for (const [uid, [r, el]] of Object.entries(rects)) if (!now.has(uid)) { (back[el.closest("#mfield") ? "me" : "opp"] ? dieFx : shatterFx)(r, el); died++; }
     for (const el of document.querySelectorAll(".field .card[data-uid]")) if (!rects[el.dataset.uid]) { el.classList.add("enter"); entered++; }   // ลงสนาม
-    if (died) SFX.play("die"); else if (entered) SFX.play("summon");
+    if (died) SFX.play("die");
+    else if (entered) {                                                  // เสียงลงสนามตามเผ่าของตัวที่เพิ่งลง (กันซ้อน 150ms)
+      const el = [...document.querySelectorAll(".field .card.enter")].pop(), u = el && viewUnit(+el.dataset.uid), race = u && u.id && ROW[u.id] ? ROW[u.id].race : null;
+      const now2 = Date.now(); if (now2 - (window._lastSum || 0) > 150) { window._lastSum = now2; SFX.play(race && race !== "neutral" ? "s_" + race : "summon"); }
+    }
     for (const [side, id] of [["me", "mhp"], ["opp", "ehp"]]) {
       const lost = prev[side].hp - V[side].hp;
       if (lost > 0) { SFX.play("hurt"); $("app").classList.remove("quake"); void $("app").offsetWidth; $("app").classList.add("quake"); const h = $(id); h.classList.remove("shake"); void h.offsetWidth; h.classList.add("shake"); floatText(h.getBoundingClientRect(), `-${lost}`); }
@@ -992,6 +1009,17 @@ const SFX = (() => {
   const S = {
     summon: () => [523, 659, 784].forEach((f, i) => tone(f, 0.09, { delay: i * 0.06 })),
     attack: () => { noise(0.14, { vol: 0.08, hp: 400 }); tone(260, 0.16, { type: "sawtooth", slide: 0.4, vol: 0.05 }); },
+    leader: () => { [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, i === 4 ? 0.6 : 0.16, { type: i === 4 ? "square" : "triangle", delay: i * 0.1, vol: 0.09 })); tone(98, 0.8, { type: "sawtooth", vol: 0.06, delay: 0.4 }); noise(0.4, { vol: 0.06, hp: 2500, delay: 0.4 }); },
+    // เสียงลงสนามประจำเผ่า
+    s_human: () => [523, 659, 784].forEach((f, i) => tone(f, 0.1, { delay: i * 0.06 })),
+    s_hell: () => { [294, 277, 220].forEach((f, i) => tone(f, 0.14, { type: "sawtooth", delay: i * 0.07, vol: 0.05 })); noise(0.15, { vol: 0.05, hp: 500 }); },
+    s_heaven: () => [1047, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.25, { type: "triangle", delay: i * 0.05, vol: 0.05 })),
+    s_spirit: () => [659, 880, 1175].forEach((f, i) => tone(f, 0.22, { type: "sine", delay: i * 0.08, vol: 0.08 })),
+    s_beast: () => { noise(0.18, { vol: 0.08, hp: 300 }); tone(180, 0.2, { type: "sawtooth", slide: 0.6, vol: 0.06 }); },
+    s_dino: () => { tone(80, 0.25, { type: "sine", vol: 0.2 }); tone(220, 0.3, { type: "sawtooth", slide: 0.5, vol: 0.05, delay: 0.08 }); },
+    s_machine: () => [880, 1320, 880, 1760].forEach((f, i) => tone(f, 0.05, { delay: i * 0.05, vol: 0.05 })),
+    s_dragon: () => { tone(330, 0.35, { type: "sawtooth", slide: 0.35, vol: 0.07 }); noise(0.3, { vol: 0.07, hp: 1500, delay: 0.05 }); },
+    s_fish: () => [440, 587, 784, 1047].forEach((f, i) => tone(f, 0.08, { type: "sine", delay: i * 0.05, vol: 0.09 })),
     heavy: () => { tone(70, 0.35, { type: "sine", slide: 0.5, vol: 0.22 }); noise(0.2, { vol: 0.12, hp: 200 }); },
     hit: () => { noise(0.09, { vol: 0.14, hp: 1800 }); tone(110, 0.1, { vol: 0.08 }); },
     die: () => { tone(330, 0.38, { type: "triangle", slide: 0.22, vol: 0.1 }); noise(0.25, { vol: 0.05, hp: 3000, delay: 0.05 }); },
@@ -1222,11 +1250,15 @@ async function playFx(e, v) {
     const mine = mineSeat(e.by, v), from = mine ? document.querySelector(`#mhand .card[data-id="${e.id}"]`) || $("mhand") : $("ehand");
     if (!mine && !(ROW[e.id] && ROW[e.id].leader)) await showPlayed(e.id, `${v.opp.name} อัญเชิญ`, true);
     flyCard(rectOf(from), rectOf($(mine ? "mfield" : "efield")), { id: e.id, ms: 380 }); await sleep(260);
-    if (ROW[e.id] && ROW[e.id].leader) {
-      SFX.play("win"); const d = document.createElement("div"); d.className = "leader-scene";
-      d.innerHTML = `<b class="px-text">หัวหน้าลงสนาม!</b>`; d.appendChild(cardEl(ROW[e.id])); document.body.appendChild(d);
+    if (ROW[e.id] && ROW[e.id].leader) {                              // ฉากหัวหน้าลงสนาม: มืด + แสงหมุนสีเผ่า + ชื่อ + เสียงประกาศ (แตะเพื่อข้าม)
+      const r = ROW[e.id], [c1, c2] = RACEFX[r.race] || RACEFX.neutral, ms = 2200 * SET.speed, d = document.createElement("div");
+      d.className = "leader-scene"; d.style.setProperty("--lc", c1 + "90"); d.style.setProperty("--lc2", c2 + "55"); d.style.setProperty("--ld", ms + "ms");
+      d.innerHTML = `<div class="rays"></div><b class="px-text">${mine ? "หัวหน้าของคุณ!" : "หัวหน้าศัตรู!"}</b>`;
+      d.appendChild(cardEl(r)); d.insertAdjacentHTML("beforeend", `<div class="lname">${esc(r.name)}</div><div class="skip">แตะเพื่อข้าม</div>`);
+      document.body.appendChild(d); SFX.play("leader");
       $("app").classList.remove("quake"); void $("app").offsetWidth; $("app").classList.add("quake");
-      await sleep(1300); d.remove();
+      setTimeout(() => dots([innerWidth / 2, innerHeight / 2], [c1, c2, "#fff6e0"], 14, 220, 1100), 350);
+      await new Promise((ok) => { const t = setTimeout(ok, ms); d.onclick = () => { clearTimeout(t); ok(); }; }); d.remove();
     }
   } else if (e.t === "draw") {                                         // จั่ว: หลังการ์ดบินจากเดคเข้ามือ
     const mine = mineSeat(e.by, v), from = rectOf($(mine ? "mdeck" : "edeck")), to = rectOf($(mine ? "mhand" : "ehand"));
@@ -2366,6 +2398,19 @@ if (location.hash === "#nethost" || location.hash === "#netguest") {
   if (location.hash === "#netguest") { saveDecks([{ name: "เดคทดสอบ", ids: Engine.buildDeck(ALL, ARCHS[5][0]).map((c) => c.id) }]); refreshDeckSelects(); $("mydeck").value = "d:0"; }
   if (location.hash === "#nethost") $("host").click(); else $("join").click();
 }
+</script>
+<script>
+// หน้าโลโก้ตอนเปิดเกม: ครั้งเดียวต่อ session · ไม่แสดงเมื่อเข้าด้วยลิงก์ห้อง/เดค หรือหน้าทดสอบ (#...) · แตะ = ข้าม + ปลดล็อกเสียง
+(function () {
+  let seen = false; try { seen = sessionStorage.getItem("splash") === "1"; } catch {}
+  if (seen || location.search || location.hash) return;
+  try { sessionStorage.setItem("splash", "1"); } catch {}
+  const d = document.createElement("div"); d.id = "splash";
+  d.innerHTML = `<img src="img/ui_logo.png" alt=""><div class="gname">Battle of Banmo</div><div class="tap">แตะเพื่อเริ่ม</div>`;
+  document.body.appendChild(d);
+  const go = () => { d.classList.add("out"); setTimeout(() => d.remove(), 520); };
+  d.addEventListener("pointerdown", go); setTimeout(go, 3200);
+})();
 </script>
 </body>
 </html>
