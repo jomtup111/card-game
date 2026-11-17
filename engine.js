@@ -2,7 +2,7 @@
 // ใช้ได้ทั้งในเบราว์เซอร์ (window.Engine) และ node (module.exports)
 (function (root) {
   "use strict";
-  const HP = 5, HAND0 = 5, FIELD = 5, DRAW = 1;
+  const HP = 5, HAND0 = 5, FIELD = 5, DRAW = 2;   // จั่ว 2 ใบต่อเทิร์น (2026-11-17 แก้มือบอด)
 
   // ---------------------------------------------------------------- ชนิด (kind)
   const ALIAS = { "ไดโน": "ไดโนเสาร์", "นก": "นกล่าเหยื่อ", "ไดโนนักล่า": "นักล่า" };
@@ -369,11 +369,13 @@
 
   // ---------------------------------------------------------------- เกม
   class Game {
-    constructor(deckA, deckB, seed = Date.now(), log = () => {}) {
+    // opt: กติกาทดลอง (ค่าเริ่มต้น = กติกาปัจจุบัน) { hand0, draw, firstDiscount, loot, catchup }
+    constructor(deckA, deckB, seed = Date.now(), log = () => {}, opt = {}) {
+      this.opt = opt;
       this.rnd = rngOf(seed); this.log = log;
       this.P = [new Player("คุณ", deckA, this.rnd), new Player("บอท", deckB, this.rnd)];
       this.turn = 0; this.deaths = 0; this.cur = 0; this.winner = null; this.onFx = null;
-      for (const p of this.P) p.draw(HAND0);
+      for (const p of this.P) p.draw(opt.hand0 || HAND0);
     }
     emit(e) { if (this.onFx) this.onFx(e); }
     arm(u) { return u.armor + u.aarmor; }
@@ -972,7 +974,8 @@
     startTurn() {
       this.turn++; const p = this.P[this.cur], e = this.other(p);
       e.reacted = false; p.reacted = true; p.turns++; this.deaths = 0; p.played = 0; p.wolfAttacked = false; p.discTurn = 0;
-      Object.assign(p, { spellUsed: 0, spellMax: 1, immune: false, overAll: 0, overNext: 0, gemAll: 0, nextRed: [] });
+      Object.assign(p, { spellUsed: 0, spellMax: 1, immune: false, overAll: 0, overNext: 0, gemAll: 0, nextRed: [], lootUsed: false });
+      if (this.opt.firstDiscount) p.nextRed.push(["มอนสเตอร์", this.opt.firstDiscount]);   // กติกาทดลอง: อัญเชิญครั้งแรกของเทิร์นถูกลง
       this.log(`—— เทิร์น ${this.turn}: ${p.name} ——`);
       for (const u of p.field) { u.temp2 = 0; u.atkd = false; u.cleaved = false; u.undo = u.undo.filter(([when, fn]) => when !== "start" || (fn(), false)); }
       for (const u of [...p.field]) {                                     // สกิลต้นเทิร์นแบบออร่า/ทริกเกอร์
@@ -993,7 +996,8 @@
       }
       if (shooters && !e.field.length) this.hurt(e, 1, " (ถูกยิง)");
       this.awakenCheck(p);
-      p.draw(DRAW);
+      p.draw(this.opt.draw || DRAW);
+      if (this.opt.minHand && p.hand.length < this.opt.minHand && !p.lost) p.draw(this.opt.minHand - p.hand.length);   // กติกาทดลอง: เติมมือขั้นต่ำ
       if (p.lost) this.log(`${p.name} เดคหมด`);
       this.checkEnd();
     }
@@ -1001,8 +1005,14 @@
       const e = this.other(p);
       for (let i = 0; i < (u.card && u.card.shoot2 ? 2 : 1); i++) { const t = this.pick(e, 1, u.shoot).filter((x) => !u.h.shootFly || x.has("บิน")); if (t.length) { this.log(`🔫 ${u.name} ยิง ${t[0].name}`); this.kill(e, t[0]); } }
     }
+    // กติกาทดลอง: เทิร์นละครั้ง ทิ้ง 1 ใบ แล้วจั่ว 1 ใบ
+    loot(p, c) {
+      if (!this.opt.loot || p.lootUsed || !p.hand.includes(c)) return "ใช้ไม่ได้";
+      p.lootUsed = true; this.discard(p, c); p.draw(1); this.log(`🔄 ${p.name} ทิ้ง ${c.name} แล้วจั่วใหม่`); this.checkEnd(); return null;
+    }
     endTurn() {
       const p = this.P[this.cur], e = this.other(p);
+      if (this.opt.catchup && p.played === 0 && !p.lost) { p.draw(1); this.log(`${p.name} ไม่ได้เล่นการ์ด จั่วเพิ่ม 1 ใบ`); }   // กติกาทดลอง
       for (const u of [...p.field]) if (u.h.attackOrDie && !u.atkd && this.turn > 1) { this.log(`${u.name} ไม่ได้โจมตี จึงตาย`); this.kill(p, u); }
       for (const u of [...p.field]) {
         u.temp = 0; u.frozen = !!u.frozenNext; u.frozenNext = false; u.direct = false;
@@ -1037,6 +1047,7 @@
           this.summon(p, best[1], best[2]); await pause();
         }
       };
+      if (this.opt.loot && p.hand.length) { const c = [...p.hand].sort((a, b) => value(a) - value(b))[0]; if (value(c) < 1) this.loot(p, c); }
       await summonPhase();
       const prio = { titan: 5, awakenall: 5, cheat: 4, kill: 3, steal: 3 };
       for (const c of p.hand.filter((c) => c.type === "เวทปกติ" && c.spell.length).sort((a, b) => (prio[b.spell[0][0]] || 0) - (prio[a.spell[0][0]] || 0) || value(b) - value(a))) {
