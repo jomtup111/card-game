@@ -511,12 +511,12 @@ function unitCard(x) {
 // role: "bot" (เล่นกับบอท) | "host" (เจ้าของห้อง) | "guest" (เข้าห้องเพื่อน)
 // เจ้าของห้อง/โหมดบอท: เกมรันใน Session บนเครื่องนี้ · ผู้เข้าห้อง: ได้แค่ view จากเจ้าของห้องแล้วส่งคำสั่งกลับไป
 let role = null, S = null, peer = null, conn = null, V = null, pendingAsk = null, overShown = false;
-let mode = "idle", sel = null, fodder = new Set(), toastTimer = 0;
+let mode = "idle", sel = null, fodder = new Set(), toastTimer = 0, gang = [];   // gang = uid มอนที่รุมตีด้วย (นอกจาก sel)
 const log = (s) => { const d = document.createElement("div"); if (s.startsWith("——")) d.className = "turn"; d.textContent = s; $("log").appendChild(d); $("log").scrollTop = 1e9; };
 const toast = (s) => { $("msg").textContent = s; $("msg").className = "px-text err"; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastTimer = 0; render(); }, 2500); };
 
 function act(a) {
-  mode = "idle"; sel = null; fodder = new Set();
+  mode = "idle"; sel = null; gang = []; fodder = new Set();
   if (role === "guest") { if (conn && conn.open) conn.send({ type: "act", a }); else toast("ไม่ได้เชื่อมต่อกับห้อง"); }
   else S.act(0, a).then((err) => err && toast(err));
   render();
@@ -540,6 +540,7 @@ function applyView(v) {
   V = v;
   if (!V.myTurn && mode !== "mull") { mode = "idle"; sel = null; fodder = new Set(); }
   if (mode === "attack" && !V.me.field.some((x) => x.uid === sel && !x.atkErr)) { mode = "idle"; sel = null; }
+  gang = gang.filter((id) => mode === "attack" && V.me.field.some((x) => x.uid === id && !x.atkErr));
   render();
   if (!FAST && prev) {
     const now = new Set([...V.me.field, ...V.opp.field].map((x) => String(x.uid)));
@@ -646,14 +647,23 @@ function render() {
   $("minfo").textContent = `เทิร์น ${V.turn} · เวทปกติ ${V.me.spellUsed}/${V.me.spellMax}`;
 
   const attacker = mode === "attack" ? V.me.field.find((x) => x.uid === sel) : null;
-  const targets = attacker ? attacker.targets : [];
+  const group = attacker ? [attacker, ...gang.map((id) => V.me.field.find((x) => x.uid === id)).filter(Boolean)] : [];
+  const targets = !attacker ? [] : group.length < 2 ? attacker.targets : attacker.targets.filter((t) => t !== "face" && group.every((g) => g.targets.includes(t)));
+  // ป้ายผลที่คาดไว้: ตีเดี่ยวใช้ค่าจาก engine · รุมตีรวม power (ประมาณ ไม่รวมโบนัสเฉพาะคู่)
+  const predOf = (x) => {
+    if (group.length < 2) return attacker.pred[x.uid];
+    const A = group.reduce((s, g) => s + g.power, 0), D = x.power + (x.armor || 0);
+    if (A < D) return `รวม ${A} vs ${D}: ตัวที่รุมตายหมด`;
+    const back = group.filter((g) => g.power < D).sort((a, b) => b.power - a.power)[0];
+    return `รวม ${A} vs ${D}: ชนะ` + (back ? ` · ${unitCard(back).name} ตาย` : "");
+  };
   // สนามศัตรู (ตอนเลือกเป้า: ขึ้นผลที่คาดไว้บนเป้าแต่ละตัว)
   const ef = $("efield"); ef.innerHTML = "";
   for (const x of V.opp.field) {
-    const hit = targets.includes(x.uid), st = hit ? [attacker.pred[x.uid], ...x.status] : x.status;
+    const hit = targets.includes(x.uid), st = hit ? [predOf(x), ...x.status] : x.status;
     const el = cardEl(unitCard(x), { powerNow: x.power, status: st, pred: hit, cls: hit ? "target" : "", unit: x });
     el.dataset.uid = x.uid;
-    el.onclick = () => { if (hit) act({ t: "attack", uid: sel, target: x.uid }); };
+    el.onclick = () => { if (!hit) return; if (group.length > 1) act({ t: "gang", uids: group.map((g) => g.uid), target: x.uid }); else act({ t: "attack", uid: sel, target: x.uid }); };
     ef.appendChild(el);
   }
   for (let i = V.opp.field.length; i < Engine.FIELD; i++) ef.insertAdjacentHTML("beforeend", `<div class="slot"></div>`);
@@ -661,7 +671,7 @@ function render() {
   // สนามเรา
   const mf = $("mfield"); mf.innerHTML = "";
   for (const x of V.me.field) {
-    const cls = !V.myTurn ? "" : x.uid === sel && mode === "attack" ? "sel" : !x.atkErr ? "ready click" : "click";
+    const cls = !V.myTurn ? "" : mode === "attack" && (x.uid === sel || gang.includes(x.uid)) ? "sel" : !x.atkErr ? "ready click" : "click";
     const el = cardEl(unitCard(x), { powerNow: x.power, status: x.status, cls, unit: x });
     el.dataset.uid = x.uid;
     el.onclick = () => clickUnit(x); mf.appendChild(el);
@@ -707,7 +717,7 @@ function render() {
       V.phase === "mull" ? (V.mullDone ? "รออีกฝ่ายเลือก mulligan…" : "เลือกการ์ดที่จะเปลี่ยน (mulligan) แล้วกดปุ่ม")
       : V.phase === "over" ? (V.winner === "me" ? "คุณชนะ!" : "คุณแพ้")
       : mode === "pay" ? `เลือกการ์ดที่จะทิ้งจ่าย gem ${V.me.hand[sel].costNow} (เลือกให้แล้ว เปลี่ยนได้ · ทิ้งเกินได้)`
-      : mode === "attack" ? `เลือกเป้าหมายของ ${attacker ? unitCard(attacker).name : ""}`
+      : mode === "attack" ? (group.length > 1 ? `รุมตีด้วย ${group.length} ตัว (รวม ${group.reduce((s, g) => s + g.power, 0)}) — แตะเป้าหมาย` : `เลือกเป้าหมายของ ${attacker ? unitCard(attacker).name : ""} · แตะมอนเรืองเขียวตัวอื่นเพื่อรุมตีรวม`)
       : V.myTurn ? (V.turn === 1 ? "ตาคุณ (เทิร์นแรกของเกมโจมตีไม่ได้)" : "ตาคุณ")
       : `ตาของ ${V.whoseTurn}…`;
   }
@@ -729,13 +739,14 @@ function clickHand(h, k) {
 }
 function clickUnit(x) {
   if (!V.myTurn) return;
-  if (mode === "attack" && x.uid === sel) { mode = "idle"; sel = null; return render(); }
+  if (mode === "attack" && x.uid === sel) { if (gang.length) { sel = gang.shift(); } else { mode = "idle"; sel = null; } return render(); }
   if (mode !== "idle" && mode !== "attack") return;
   if (x.atkErr) return toast(x.atkErr);
-  sel = x.uid; mode = "attack"; render();
+  if (mode === "attack") { gang = gang.includes(x.uid) ? gang.filter((id) => id !== x.uid) : [...gang, x.uid]; return render(); }   // เพิ่ม/เอาออกจากกลุ่มรุมตี
+  sel = x.uid; gang = []; mode = "attack"; render();
 }
-$("eface").onclick = () => { const a = mode === "attack" && V.me.field.find((x) => x.uid === sel); if (a && a.targets.includes("face")) act({ t: "attack", uid: sel, target: "face" }); };
-$("cancel").onclick = () => { mode = "idle"; sel = null; fodder = new Set(); render(); };
+$("eface").onclick = () => { const a = mode === "attack" && !gang.length && V.me.field.find((x) => x.uid === sel); if (a && a.targets.includes("face")) act({ t: "attack", uid: sel, target: "face" }); };
+$("cancel").onclick = () => { mode = "idle"; sel = null; gang = []; fodder = new Set(); render(); };
 $("endturn").onclick = () => { if (mode === "idle" && V.myTurn) act({ t: "end" }); };
 $("logbtn").onclick = (e) => { e.stopPropagation(); $("side").classList.toggle("open"); };
 document.addEventListener("click", (e) => { if (!$("side").contains(e.target)) $("side").classList.remove("open"); });
@@ -1099,7 +1110,8 @@ const TUT = [
     pic: () => { const a = TC("DIN-HUN-05", { cls: "sel" }), b = TC("HUM-GEN-01", { cls: "fodder" }), c = TC("BEA-GEN-01", { cls: "fodder" }); const ar = document.createElement("div"); ar.className = "arrow"; ar.textContent = "←"; return [a, ar, b, c]; } },
   { h: "การต่อสู้", t: `มอนสเตอร์แต่ละตัวโจมตีได้ <b>1 ครั้งต่อเทิร์น</b> และผู้โจมตีเลือกเป้าเอง<br>
      • เทียบ power: มากกว่าชนะ อีกตัวตาย · <b>เท่ากัน ผู้โจมตีชนะ</b><br>• ตีผู้เล่นได้ก็ต่อเมื่อ<b>สนามศัตรูว่าง</b> → ศัตรูเสีย 1 HP<br>
-     • คนที่เริ่มก่อนโจมตีไม่ได้ในเทิร์นแรกของเกม<br>• ตอนเลือกเป้า เกมจะขึ้นป้ายบอกผล เช่น <b>“5 vs 5: ชนะ”</b>`,
+     • คนที่เริ่มก่อนโจมตีไม่ได้ในเทิร์นแรกของเกม<br>
+     • <b>ตีรวม:</b> มอน 2 ตัวขึ้นไปรุมตีเป้าเดียว รวม power — ชนะแล้วเป้าฆ่ากลับ 1 ตัว (ตัวแรงสุดที่ power ต่ำกว่ามัน)<br>• ตอนเลือกเป้า เกมจะขึ้นป้ายบอกผล เช่น <b>“5 vs 5: ชนะ”</b>`,
     pic: () => { const v = document.createElement("div"); v.className = "vs"; v.innerHTML = "3<br>vs<br>3<br>⚔"; return [TC("DIN-HUN-05", { cls: "ready" }), v, TC("BEA-WOL-06", { status: ["3 vs 3: ชนะ"], pred: true, cls: "target" })]; } },
   { h: "เวทปกติ · เวทสวน · พรีกาย", t: `• <b>เวทปกติ</b> ใช้ในเทิร์นตัวเอง ได้ <b>1 ใบต่อเทิร์น</b> ไม่ต้องจ่าย cost<br>
      • <b>เวทสวน</b> ใช้ตอนศัตรูโจมตีหรือร่ายเวท — เกมจะเด้งถามเอง ได้ 1 ครั้งต่อเทิร์นศัตรู<br>
@@ -1151,6 +1163,8 @@ function hints() {
   if (V.phase === "over") return;
   if (!V.myTurn) { if (V.opp.field.length && V.me.hp < 5) hint("hp", "เสีย HP เมื่อศัตรูตีผู้เล่นตอน<b>สนามเราว่าง</b> — วางมอนสเตอร์ไว้กันไว้เสมอ"); return; }
   if (mode === "pay") return hint("pay", "การ์ด<b>ขอบฟ้า</b>คือการ์ดที่จะทิ้งจ่าย gem (เกมเลือกตัวที่คุ้มสุดให้) · แตะเพื่อเลือก/ยกเลิก · gem พอแล้วกด <b>อัญเชิญ</b>");
+  if (mode === "attack" && V.opp.field.some((x) => V.me.field.filter((y) => !y.atkErr).every((y) => y.power < x.power + (x.armor || 0))) && V.me.field.filter((y) => !y.atkErr).length > 1)
+    return hint("gang", "ศัตรูตัวใหญ่เกินจะตีเดี่ยว? แตะ<b>มอนเรืองเขียวตัวอื่นเพิ่ม</b>เพื่อ<b>รุมตีรวม power</b> — ชนะแล้วเป้าจะฆ่ากลับ 1 ตัว");
   if (mode === "attack") return hint("aim", "เป้าที่ตีได้มี<b>ขอบแดง</b> พร้อมป้ายบอกผล เช่น “4 vs 3: ชนะ” · ถ้าสนามศัตรูว่าง ให้แตะ<b>หัวใจศัตรู</b>");
   if ((V.me.abilities || []).some((a) => !a.err)) hint("abil", "มีปุ่ม <b>✦ สกิล</b> ขึ้นที่แถบล่าง — การ์ดบางใบมีสกิลที่กดใช้เองได้ เช่น ฟื้นคืนจากสุสาน");
   if (V.me.field.some((x) => !x.atkErr)) return hint("ready", "มอนสเตอร์ที่<b>เรืองเขียว</b>โจมตีได้ — แตะมัน แล้วเลือกเป้าหมาย");
@@ -1181,6 +1195,13 @@ if (location.hash === "#tiptest" || location.hash === "#ziptest") {             
     else el.dispatchEvent(new PointerEvent("pointerdown", { pointerType: "touch", bubbles: true }));
   };
   if (location.hash === "#tiptest") setInterval(() => { if (!document.querySelector(".tip")) go(); }, 300); else setTimeout(go, 3500);
+}
+if (location.hash === "#gangtest") {                                                  // ทดสอบหน้าจอตีรวม
+  $("go").click(); S.act(0, { t: "mull", idx: [] });
+  setTimeout(() => { const [A, B] = S.G.P; S.G.cur = 0; S.G.turn = 3; A.field.length = B.field.length = 0;
+    for (const p of [3, 4]) { const u = new Engine.Unit(CARD["HUM-GEN-01"]); u.power = p; u.attacksLeft = 1; A.field.push(u); }
+    const big = new Engine.Unit(CARD["HUM-KNI-10"]); B.field.push(big); S.push();
+    setTimeout(() => { clickUnit(V.me.field[0]); clickUnit(V.me.field[1]); }, 400); }, 2500);
 }
 if (location.hash === "#practice") { $("practice").click(); }
 if (location.hash === "#builder") { openBuilder(); $("dfill").click(); document.querySelector("#fillok").click(); }   // ทดสอบหน้าจัดเดค

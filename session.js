@@ -101,6 +101,9 @@
           const c = p.hand[a.k], ks = [...new Set(a.f || [])];
           if (!c || ks.includes(a.k) || ks.some((k) => !p.hand[k])) err = "เลือกการ์ดไม่ถูกต้อง";
           else err = await G.summon(p, c, ks.map((k) => p.hand[k]), this.reactFn);
+        } else if (a.t === "gang") {
+          const ids = Array.isArray(a.uids) ? a.uids : [], us = ids.map((id) => p.field.find((x) => x.uid === id)), t = e.field.find((x) => x.uid === a.target);
+          err = us.some((u) => !u) || !t || new Set(ids).size !== ids.length ? "เลือกไม่ถูกต้อง" : await G.attackGroup(p, us, t, this.reactFn);
         } else if (a.t === "ability") {
           err = G.useAbility(p, String(a.key || ""), Number.isInteger(a.k) ? a.k : null);
         } else if (a.t === "cast") {

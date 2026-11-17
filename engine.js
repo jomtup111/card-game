@@ -200,6 +200,7 @@
       if ((m = x.match(/^(ทิ้งการ์ด (\d+) ใบ: )?ตัวที่โจมตี power −(\d+) (ถาวร|จนจบเทิร์น)$/))) return { t: "debuff", n: +m[3], perm: m[4] === "ถาวร", pay: m[2] ? +m[2] : 0 };
       if ((m = x.match(/^(?:ถ้ามี(.+?)ฝั่งเรา )?ทำลาย(?:ตัวที่โจมตี|มอนสเตอร์ที่กำลังโจมตี) ถ้า power(?: ของมัน)? ≤ (\d+|จำนวนเครื่องจักรฝั่งเรา \+ 1)$/))) return { t: "killif", n: /\d+$/.test(m[2]) && !m[2].includes("+") ? +m[2] : "mac", have: m[1] || null };
       if ((m = x.match(/^(\S+?)ฝั่งเรา 1 ตัวทำลายตัวที่โจมตี ถ้า power ของมัน ≤ power ของ/))) return { t: "killif", n: "kind", kind: normKind(m[1]) };
+      if ((m = x.match(/^ถ้าตัวที่โจมตี power ≥ (\d+) ทำลายมัน$/))) return { t: "killif", min: +m[1] };
       if ((m = x.match(/^ถ้าตัวที่โจมตี (power|cost) ≤ (\d+) ส่ง(ไปใต้เดค|กลับขึ้นมือ)/))) return { t: "removeif", stat: m[1], n: +m[2], where: m[3].includes("มือ") ? "hand" : "deck" };
       if ((m = x.match(/^ถ้ามี(\S+?)ฝั่งเรา ≥ (\d+) ตัว ส่งมอนสเตอร์ที่กำลังโจมตีกลับขึ้นมือ$/))) return { t: "removeif", stat: "power", n: 99, where: "hand", have: [m[1], +m[2]] };
       if ((m = x.match(/^สร้าง(\S+?) 1 ตัว.*รับการโจมตีแทน$/)) && TOKENS[normKind(m[1])]) return { t: "block", token: normKind(m[1]) };
@@ -286,6 +287,7 @@
         if ((m = part.match(/^เทิร์นนี้ป้อมทุกตัวฝั่งเรายิงได้แรงขึ้น \+(\d+)$/))) { out.push(["volley", +m[1]]); continue; }
         if ((m = part.match(/^ทิ้ง (\d+) ใบ$/))) { out.push(["discard", +m[1]]); continue; }
         if (/^ทำลายไข่หรือโทเคนของศัตรู 1 ตัว$/.test(part)) { out.push(["killtok"]); continue; }
+        if ((m = part.match(/^ทำลายมอนสเตอร์ศัตรู 1 ตัวที่ power ≥ (\d+)$/))) { out.push(["killbig", +m[1]]); continue; }
         if (/^ทำลายมอนสเตอร์ศัตรู 1 ตัวต่อค่าผสานธาตุ$/.test(part)) { out.push(["kill", "elem", null, null]); continue; }
         if (/^ทิ้งการ์ด 1 ใบเพื่อจั่ว 1 ใบได้$/.test(part)) { out.push(["loot"]); continue; }
         if ((m = part.match(/^ถ้าฝั่งเรามี(\S+?)อย่างน้อย (\d+) ตัว จั่ว (\d+) ใบ$/))) { out.push(["drawif", m[1], +m[2], +m[3]]); continue; }
@@ -381,7 +383,7 @@
   class Game {
     // opt: กติกาทดลอง (ค่าเริ่มต้น = กติกาปัจจุบัน) { hand0, draw, firstDiscount, loot, catchup }
     constructor(deckA, deckB, seed = Date.now(), log = () => {}, opt = {}) {
-      this.opt = opt;
+      this.opt = Object.assign({ gang: 2 }, opt);   // ตีรวม (2026-11-17): รุมตีได้ เป้าฆ่ากลับ 1 ตัว · ทดลองปิดด้วย { gang: 0 }
       this.rnd = rngOf(seed); this.log = log;
       this.P = [new Player("คุณ", deckA, this.rnd), new Player("บอท", deckB, this.rnd)];
       this.turn = 0; this.deaths = 0; this.cur = 0; this.winner = null; this.onFx = null;
@@ -556,6 +558,7 @@
         if (k === "draw") { if (a[2] && !this.count(p, a[2])) continue; this.extraDraw(p, a[1]); }
         else if (k === "drawto") this.extraDraw(p, Math.max(0, a[1] - p.hand.length));
         else if (k === "noop") {}
+        else if (k === "killbig") { const t = e.field.filter((u) => this.eff(e, u) >= a[1]).sort((x, y) => this.eff(e, y) - this.eff(e, x))[0]; if (t) this.kill(e, t, spell); }
         else if (k === "volley") { for (const u of [...p.field]) if (u.shoot != null && p.field.includes(u)) this.shootWith(p, u, a[1]); }
         else if (k === "killtok") { const t = e.field.filter((u) => !u.card || u.kinds.has("ไข่")).sort((x, y) => this.eff(e, y) - this.eff(e, x))[0]; if (t) this.kill(e, t, spell); }
         else if (k === "loot") { const c = [...p.hand].sort((x, y) => value(x) - value(y))[0]; if (c && value(c) < 1) { this.discard(p, c); this.extraDraw(p, 1); } }
@@ -865,6 +868,7 @@
     hurt(e, n, why = "") {
       if (e.immune) { this.log(`${e.name} ไม่เสีย HP (คุ้มครอง)`); return; }
       e.hp -= n; this.log(`❤ ${e.name} เสีย ${n} HP${why} (เหลือ ${e.hp})`);
+      if (this.opt.hurtDraw && e.hp > 0) e.draw(this.opt.hurtDraw);   // กติกาทดลอง: เสีย HP แล้วจั่ว
     }
     // react(defender, info) → ตัวเลือกจาก info.opts หรือ null (async ได้)
     //   info = { opts, targetIsPlayer, target, attacker }  ตอนถูกโจมตี  |  { opts, spell } ตอนศัตรูร่ายเวท
@@ -894,7 +898,7 @@
         if (ht.thorns) u.power -= ht.thorns;
       }
       if (hu.weaken) t.temp -= hu.weaken; if (ht.weaken) u.temp -= ht.weaken;
-      const A = this.eff(p, u, true, t), base = this.eff(e, t, false, u), D = base + (hu.pierce ? 0 : this.arm(t)) + (o.bonus || 0);
+      const A = this.eff(p, u, true, t), base = this.eff(e, t, false, u), D = base + (hu.pierce ? 0 : this.arm(t)) + (o.bonus || 0) - (this.opt.wear ? t.dmg || 0 : 0);
       let attDies = t.has("พิษ") || D > A, defDies = u.has("พิษ") || A >= D;
       if (attDies && u.has("บิน") && !t.has("พิษ")) attDies = false;
       if (hu.trade != null && base <= hu.trade) attDies = defDies = true;
@@ -902,6 +906,7 @@
       if (defDies && t.hitTurn !== this.turn && (ht.firstHit || (t.kinds.has("ไข่") && this.fieldHas(e, "eggGuard")))) { defDies = false; this.log(`   ${t.name} รอดจากการถูกโจมตีครั้งแรก`); }
       t.hitTurn = this.turn;
       this.log(`   ${u.name} ${A} vs ${t.name} ${D}`);
+      if (this.opt.wear && !defDies && !o.fight) { t.dmg = (t.dmg || 0) + Math.max(0, A); this.log(`   ${t.name} รับดาเมจสะสม ${t.dmg} (หายตอนจบเทิร์น)`); }   // กติกาทดลอง
       if (defDies) this.kill(e, t);
       const killed = defDies && !e.field.includes(t);
       if (attDies) this.kill(p, u);
@@ -959,6 +964,7 @@
           if (r.have && !this.count(d, r.have)) return false;
           if (r.n === "mac") return ap() <= this.count(d, "เครื่องจักร") + 1;
           if (r.n === "kind") return d.field.some((x) => kindMatch(x.kinds, r.kind) && this.eff(d, x) >= ap());
+          if (r.min != null) return ap() >= r.min;
           return ap() <= r.n;
         }
         case "removeif":
@@ -1097,11 +1103,11 @@
       if (this.opt.catchup && p.played === 0 && !p.lost) { p.draw(1); this.log(`${p.name} ไม่ได้เล่นการ์ด จั่วเพิ่ม 1 ใบ`); }   // กติกาทดลอง
       for (const u of [...p.field]) if (u.h.attackOrDie && !u.atkd && this.turn > 1) { this.log(`${u.name} ไม่ได้โจมตี จึงตาย`); this.kill(p, u); }
       for (const u of [...p.field]) {
-        u.temp = 0; u.frozen = !!u.frozenNext; u.frozenNext = false; u.direct = false;
+        u.temp = 0; u.dmg = 0; u.frozen = !!u.frozenNext; u.frozenNext = false; u.direct = false;
         u.undo = u.undo.filter(([when, fn]) => when !== "end" || (fn(), false));
         if (u.stolenFrom) { p.field.splice(p.field.indexOf(u), 1); const o = u.stolenFrom; u.stolenFrom = null; if (o.field.length < FIELD) o.field.push(u); else if (u.card) o.grave.push(u.card); }
       }
-      for (const u of e.field) u.temp = 0;
+      for (const u of e.field) { u.temp = 0; u.dmg = 0; }
       this.refresh();
       this.cur = 1 - this.cur;
     }
@@ -1131,12 +1137,14 @@
         }
       };
       if (this.opt.loot && p.hand.length) { const c = [...p.hand].sort((a, b) => value(a) - value(b))[0]; if (value(c) < 1) this.loot(p, c); }
+      await this.botGemKill(p, e);
       await summonPhase();
-      const prio = { titan: 5, awakenall: 5, cheat: 4, kill: 3, steal: 3 };
+      const prio = { titan: 5, awakenall: 5, cheat: 4, killbig: 4, kill: 3, steal: 3 };
       for (const c of p.hand.filter((c) => c.type === "เวทปกติ" && c.spell.length).sort((a, b) => (prio[b.spell[0][0]] || 0) - (prio[a.spell[0][0]] || 0) || value(b) - value(a))) {
         if (this.spellUsable(p, c)) continue;
         const k = c.spell[0][0];
         if (["kill", "bounce", "bottom", "curse", "freeze", "steal"].includes(k) && !e.field.length) continue;
+        if (k === "killbig" && !e.field.some((u) => this.eff(e, u) >= c.spell[0][1])) continue;
         if (["draw", "drawto"].includes(k) && p.hand.length > 5) continue;
         if (k === "token" && p.field.length >= FIELD) continue;
         if ((k === "buff" || k === "own" || k === "sacown" || k === "fight") && !p.field.length) continue;
@@ -1148,6 +1156,8 @@
         await pause(); break;
       }
       await summonPhase();
+      if (this.opt.wear) await this.botGang(p, e, react, pause);
+      if (this.opt.gang) await this.botGangAttack(p, e, react, pause);
       for (const u of [...p.field].sort((a, b) => this.eff(p, b) - this.eff(p, a))) {
         while (!this.winner && p.field.includes(u) && !this.canAttack(p, u)) {
           const ts = this.targets(p, u); if (!ts.length) break;
@@ -1155,6 +1165,84 @@
           if (t !== "face") { const win = ts.filter((x) => u.has("พิษ") || this.eff(p, u, true, x) >= this.eff(e, x, false, u) + this.arm(x)); if (!win.length && !u.h.mustAttack && !(u.h.attackOrDie && !u.atkd)) break; t = win.length ? win.sort((a, b) => this.eff(e, b) - this.eff(e, a))[0] : ts.sort((a, b) => this.eff(e, a) - this.eff(e, b))[0]; }
           await this.attack(p, u, t, react); await pause();
         }
+      }
+    }
+    // กติกาทดลอง "ทิ้งการ์ดฆ่าตัวใหญ่": เทิร์นละครั้ง ทิ้งการ์ดให้ gem รวม ≥ power ของเป้า (+extra) → ทำลายมอนศัตรู 1 ตัว
+    gemKillCost(e, t) { return this.eff(e, t) + this.arm(t) + (this.opt.gemKill === true ? 0 : this.opt.gemKill || 0); }
+    gemKill(p, t, fodder) {
+      const e = this.other(p);
+      if (!this.opt.gemKill || p.gemKillTurn === this.turn || !e.field.includes(t)) return "ใช้ไม่ได้";
+      const need = this.gemKillCost(e, t), have = fodder.reduce((s, x) => s + this.gemOf(p, x), 0);
+      if (have < need) return `gem ไม่พอ (ต้องใช้ ${need})`;
+      p.gemKillTurn = this.turn; for (const x of fodder) this.discard(p, x);
+      this.log(`💣 ${p.name} ทิ้ง ${fodder.length} ใบ ทำลาย ${t.name}`); this.kill(e, t); this.checkEnd(); return null;
+    }
+    async botGemKill(p, e) {
+      if (!this.opt.gemKill || p.gemKillTurn === this.turn || !e.field.length) return;
+      const myMax = Math.max(0, ...p.field.map((x) => this.eff(p, x)));
+      const t = e.field.filter((x) => this.eff(e, x) + this.arm(x) > myMax && this.eff(e, x) >= 5).sort((a, b) => this.eff(e, b) - this.eff(e, a))[0];
+      if (!t) return; const fod = this.autoPay(p, this.gemKillCost(e, t), null); if (fod) this.gemKill(p, t, fod);
+    }
+    // กติกาทดลอง "ตีรวม" (opt.gang = 1 | 2): มอน 2 ตัวขึ้นไปรุมตีเป้าเดียว รวม power
+    //   ชนะ (รวม ≥ เป้า) → เป้าตาย; แบบ 2: เป้าฆ่ากลับ 1 ตัว (ตัวแรงสุดที่ power < เป้า) · แพ้ → ตัวที่รุมตายหมด (ยกเว้นบิน)
+    canGang(p, us, t) {
+      if (!this.opt.gang) return "ยังไม่เปิดกติกาตีรวม";
+      if (us.length < 2) return "ต้องเลือกอย่างน้อย 2 ตัว";
+      for (const u of us) { const err = this.canAttack(p, u); if (err) return `${u.name}: ${err}`; if (!this.targets(p, u).includes(t)) return `${u.name} ตีเป้านี้ไม่ได้`; }
+      return null;
+    }
+    gangPower(p, us, t) { return us.reduce((s, u) => s + this.eff(p, u, true, t), 0); }
+    async attackGroup(p, us, t, react) {
+      const err = this.canGang(p, us, t); if (err) return err;
+      const e = this.other(p);
+      for (const u of us) { u.attacksLeft--; u.atkd = true; this.emit({ t: "attack", a: u.uid, b: t.uid, by: this.P.indexOf(p) }); }
+      this.log(`⚔ ${us.map((u) => u.name).join(" + ")} รุมตี ${t.name}`);
+      const lead = us.reduce((a, b) => (this.eff(p, a) >= this.eff(p, b) ? a : b));
+      const r = await this.doReact(e, false, t, lead, react);
+      if (r) { const res = this.resolveReact(e, p, lead, t, r); if (res.cancel) { this.checkEnd(); return null; } if (res.t !== t) { await this.combat(p, lead, e, res.t, res); this.checkEnd(); return null; } }
+      const A = this.gangPower(p, us, t), D = this.eff(e, t, false, lead) + this.arm(t);
+      const poison = us.some((u) => u.has("พิษ"));
+      this.log(`   รวม ${A} vs ${t.name} ${D}`);
+      if (A >= D || poison) {
+        this.kill(e, t);
+        if (this.opt.gang === 2 && !e.field.includes(t)) {
+          const v = us.filter((u) => p.field.includes(u) && this.eff(p, u) < D).sort((a, b) => this.eff(p, b) - this.eff(p, a))[0];
+          if (v && !v.has("บิน")) { this.log(`   ${t.name} ฆ่ากลับ ${v.name}`); this.kill(p, v); }
+        }
+      } else for (const u of us) if (!u.has("บิน")) this.kill(p, u);
+      this.checkEnd(); return null;
+    }
+    async botGangAttack(p, e, react, pause) {
+      for (let guard = 0; guard < 4 && !this.winner; guard++) {
+        const ready = p.field.filter((u) => !this.canAttack(p, u));
+        if (ready.length < 2) return;
+        const best = Math.max(...ready.map((u) => this.eff(p, u, true)));
+        const tgt = e.field.filter((x) => ready.some((u) => this.targets(p, u).includes(x))).map((x) => [x, this.eff(e, x) + this.arm(x)])
+          .filter(([x, d]) => d > best).sort((a, b) => b[1] - a[1]);
+        let done = false;
+        for (const [t, need] of tgt) {
+          const pool = ready.filter((u) => this.targets(p, u).includes(t)).sort((a, b) => this.eff(p, a) - this.eff(p, b));
+          let use = null;                                                  // ชุดที่เล็กสุดที่รวมถึง: ลองจากตัวเล็กขึ้นไป
+          for (let k = 2; k <= pool.length && !use; k++) { const top = pool.slice(-k); if (this.gangPower(p, top, t) >= need) { use = top; for (let i = 0; i + k <= pool.length; i++) { const w = pool.slice(i, i + k); if (this.gangPower(p, w, t) >= need) { use = w; break; } } } }
+          if (use) { await this.attackGroup(p, use, t, react); await pause(); done = true; break; }
+        }
+        if (!done) return;
+      }
+    }
+    // กติกาทดลอง "ดาเมจสะสม": ใช้ตัวเล็กหลายตัวรุมล้มตัวใหญ่ที่ไม่มีตัวไหนชนะได้คนเดียว
+    async botGang(p, e, react, pause) {
+      for (let guard = 0; guard < 5 && !this.winner; guard++) {
+        const ready = p.field.filter((u) => !this.canAttack(p, u));
+        if (ready.length < 2) return;
+        const best = Math.max(...ready.map((u) => this.eff(p, u, true)));
+        const big = e.field.filter((x) => ready.some((u) => this.targets(p, u).includes(x))).map((x) => [x, this.eff(e, x) + this.arm(x) - (x.dmg || 0)])
+          .filter(([x, d]) => d > best && this.eff(e, x) >= 5).sort((a, b) => b[1] - a[1])[0];
+        if (!big) return;
+        const [t, need] = big, order = ready.filter((u) => this.targets(p, u).includes(t)).sort((a, b) => this.eff(p, a) - this.eff(p, b));
+        let sum = 0, use = [];
+        for (const u of order) { use.push(u); sum += this.eff(p, u, true); if (sum >= need) break; }
+        if (sum < need) return;
+        for (const u of use) { if (!e.field.includes(t) || this.winner) break; await this.attack(p, u, t, react); await pause(); }
       }
     }
     botReact(d, info) {
