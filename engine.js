@@ -490,7 +490,7 @@
       }
       owner.field.splice(owner.field.indexOf(u), 1); this.deaths++;
       const real = u.stolenFrom || owner; real.grave.push(...u.attached, ...(u.parts || []));
-      this.log(`💀 ${u.name} ตาย`);
+      this.emit({ t: "die", uid: u.uid }); this.log(`💀 ${u.name} ตาย`);
       this.onDie(owner, u);
       if (u.card) {
         const c = u.card;
@@ -917,7 +917,7 @@
       if (o.survive) defDies = false;
       if (defDies && t.hitTurn !== this.turn && (ht.firstHit || (t.kinds.has("ไข่") && this.fieldHas(e, "eggGuard")))) { defDies = false; this.log(`   ${t.name} รอดจากการถูกโจมตีครั้งแรก`); }
       t.hitTurn = this.turn;
-      this.log(`   ${u.name} ${A} vs ${t.name} ${D}`);
+      this.emit({ t: "clash", a: [u.uid], ap: A, b: t.uid, bp: D }); this.log(`   ${u.name} ${A} vs ${t.name} ${D}`);
       if (this.opt.wear && !defDies && !o.fight) { t.dmg = (t.dmg || 0) + Math.max(0, A); this.log(`   ${t.name} รับดาเมจสะสม ${t.dmg} (หายตอนจบเทิร์น)`); }   // กติกาทดลอง
       if (defDies) this.kill(e, t);
       const killed = defDies && !e.field.includes(t);
@@ -1249,7 +1249,7 @@
       if (r) { const res = this.resolveReact(e, p, lead, t, r); if (res.cancel) { this.checkEnd(); return null; } if (res.t !== t) { await this.combat(p, lead, e, res.t, res); this.checkEnd(); return null; } }
       const A = this.gangPower(p, us, t), D = this.eff(e, t, false, lead) + this.arm(t);
       const poison = us.some((u) => u.has("พิษ"));
-      this.log(`   รวม ${A} vs ${t.name} ${D}`);
+      this.emit({ t: "clash", a: us.map((u) => u.uid), ap: A, b: t.uid, bp: D }); this.log(`   รวม ${A} vs ${t.name} ${D}`);
       if (A >= D || poison) {
         this.kill(e, t);
         if (this.opt.gang === 2 && !e.field.includes(t)) {

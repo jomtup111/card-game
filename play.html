@@ -976,9 +976,9 @@ function applyView(v) {
   if (!FAST && prev) {
     const now = new Set([...V.me.field, ...V.opp.field].map((x) => String(x.uid)));
     let died = 0, entered = 0;
-    // ออกจากสนาม: ถ้ามือ/เดคฝั่งนั้นโตขึ้น = ถูกส่งกลับ (ควันเดิม) · ไม่งั้น = ตายจริง (แตกเป็นเสี่ยง)
-    const back = { me: V.me.hand.length > prev.me.hand.length || V.me.deck > prev.me.deck, opp: V.opp.handCount > prev.opp.handCount || V.opp.deck > prev.opp.deck };
-    for (const [uid, [r, el]] of Object.entries(rects)) if (!now.has(uid)) { (back[el.closest("#mfield") ? "me" : "opp"] ? dieFx : shatterFx)(r, el); died++; }
+    // ออกจากสนาม: ตายจริง (มีเหตุการณ์ die) = แตกเป็นเสี่ยง (สูงสุด 4 ตัวต่อครั้ง กันมือถือหน่วง) · ส่งกลับมือ/เดค/อื่นๆ = ควันเดิม
+    const dead = new Set((V.fx || []).filter((e) => e.t === "die").map((e) => String(e.uid))); let shat = 0;
+    for (const [uid, [r, el]] of Object.entries(rects)) if (!now.has(uid)) { (dead.has(uid) && shat++ < 4 ? shatterFx : dieFx)(r, el); died++; }
     for (const el of document.querySelectorAll(".field .card[data-uid]")) if (!rects[el.dataset.uid]) { el.classList.add("enter"); entered++; }   // ลงสนาม
     if (died) SFX.play("die");
     else if (entered) {                                                  // เสียงลงสนามตามเผ่าของตัวที่เพิ่งลง (กันซ้อน 150ms)
@@ -1231,21 +1231,21 @@ async function playFx(e, v) {
   if (skillSrc && ["zap", "hit", "pow", "freeze", "shield"].includes(e.t)) {     // เส้นแสงจากการ์ดที่ใช้สกิลไปหาเป้า
     const t = unitEl(e.uid); if (t) { beam(skillSrc.pt, t, e.t === "pow" && e.n > 0 ? "buff" : skillSrc.mine ? "" : "opp"); await sleep(160); }
   }
+  if (e.t === "clash") {                                              // ตัวเลข power จริงตอนเทียบ (รวมเกราะ/โบนัสเฉพาะเป้า/เวทสวน)
+    const a = unitEl(e.a[0]), t = unitEl(e.b), heavy = e.ap >= 6;
+    clashNum(a, e.ap, "atk" + (heavy ? " heavy" : "")); clashNum(t, e.bp, "");
+    if (heavy && t) heavyHit(t); await sleep(heavy ? 380 : 260); return;
+  }
   if (e.t === "hit") { const t = unitEl(e.uid); if (t) { impact(t); SFX.play("hit"); await sleep(180); } return; }
   if (e.t === "attack") {
     const a = unitEl(e.a); if (!a) return;
     const mine = a.parentElement.id === "mfield";
     const t = e.b === "face" ? $(mine ? "ehp" : "mhp") : unitEl(e.b); if (!t) return;
-    const ua = viewUnit(e.a), ub = e.b === "face" ? null : viewUnit(e.b), ap = ua ? ua.power : null, heavy = ap >= 6;
-    SFX.play("attack"); lunge(a, t); await sleep(290); impact(t);
-    clashNum(a, ap, "atk" + (heavy ? " heavy" : "")); if (ub) clashNum(t, ub.power, "");
-    if (heavy) heavyHit(t); await sleep(heavy ? 420 : 320);
+    SFX.play("attack"); lunge(a, t); await sleep(290); impact(t); await sleep(300);
   } else if (e.t === "gang") {                                         // รุมตี: พุ่งพร้อมกันทุกตัว
     const as = e.as.map(unitEl).filter(Boolean), t = unitEl(e.b); if (!as.length || !t) return;
     SFX.play("attack"); as.forEach((a, k) => setTimeout(() => lunge(a, t), k * 70)); await sleep(290 + as.length * 70);
-    const sum = e.as.reduce((n, uid) => n + ((viewUnit(uid) || {}).power || 0), 0), ub = viewUnit(e.b);
-    impact(t); burst("img/ui_star.png", center(rectOf(t)), 10, 70); clashNum(as[0], sum, "atk" + (sum >= 6 ? " heavy" : "")); if (ub) clashNum(t, ub.power, "");
-    if (sum >= 6) heavyHit(t); await sleep(sum >= 6 ? 450 : 380);
+    impact(t); burst("img/ui_star.png", center(rectOf(t)), 10, 70); await sleep(350);
   } else if (e.t === "cast" || e.t === "react") {
     const who = e.by === v.seat ? "คุณ" : v.opp.name;
     SFX.play(e.t === "cast" ? "cast" : "react");
@@ -1990,7 +1990,8 @@ function hostData(c, d) {
       if (!d.token || d.token !== NET.token) { c.send({ type: "full" }); setTimeout(() => c.close(), 500); return; }
       if (conn && conn !== c) try { conn.close(); } catch {}
       conn = c; heartbeat(c); netWaitOff();
-      c.send({ type: "resume", logs: NET.logs }); S.push(); console.log("RESUME host turn " + S.G.turn);
+      c.send({ type: "resume", logs: NET.logs }); c.send({ type: "meet", pid: MYPID }); S.push(); console.log("RESUME host turn " + S.G.turn);
+      if (typeof d.pid === "string") NET.oppPid = d.pid.slice(0, 16);
       if (NET.askP) c.send({ type: "ask", p: NET.askP });
       toast(`${guestName} กลับเข้าห้องแล้ว`); return;
     }
@@ -2098,6 +2099,7 @@ async function watchRoom(code) {
 // เปิดด้วยลิงก์เดค (?deck=): โชว์ตัวอย่างเดค + ปุ่มบันทึก (ไม่ทับเดคเดิม) แล้วลบพารามิเตอร์ออกจาก URL
 (function () {
   const q = new URLSearchParams(location.search), code = q.get("deck"); if (!code) return;
+  try { sessionStorage.setItem("splash", "1"); } catch {}               // กันหน้าโลโก้ขึ้นทับ (URL จะถูกล้างพารามิเตอร์ก่อนสคริปต์โลโก้รัน)
   const name = (q.get("n") || "เดคจากเพื่อน").slice(0, 24); q.delete("deck"); q.delete("n");
   try { history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash); } catch {}
   const ids = Engine.parseAnyDeckCode(code, ALL), err = !ids ? "ลิงก์เดคนี้ใช้ไม่ได้ (อาจเป็นการ์ดเวอร์ชันเก่า)" : ids.some((id) => !CARD[id]) ? "มีการ์ดที่ไม่รู้จัก" : Engine.validateDeck(ALL, ids);
