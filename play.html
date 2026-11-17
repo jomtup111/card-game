@@ -204,6 +204,36 @@
   @keyframes bob { 50% { transform: translateY(-6px); } }
   .mascots { display: flex; gap: 4px; margin: 10px 0 6px; flex-wrap: wrap; justify-content: center; }
   .mascots img { width: 64px; height: auto; animation: bob 2.2s ease-in-out infinite; filter: drop-shadow(0 4px 0 #0006); }
+  .tbar { width: 100%; display: flex; align-items: center; gap: 10px; }
+  .profile { display: flex; align-items: center; gap: 8px; padding: 0 6px; margin: 0; }
+  .profile img { width: 36px; image-rendering: pixelated; }
+  .profile span { color: var(--dim); font-size: 13px; }
+  .profile input { width: 150px; }
+  .mainmenu { display: grid; grid-template-columns: minmax(260px, 340px) minmax(240px, 300px); gap: 26px; align-items: center; margin: 14px 0 6px; }
+  .menubtns { display: flex; flex-direction: column; gap: 12px; }
+  button.big { min-height: 58px; font-size: 20px; letter-spacing: .5px; }
+  .menubtns button.big { animation: menuin .45s ease-out backwards; }
+  .menubtns button:nth-child(2) { animation-delay: .06s; } .menubtns button:nth-child(3) { animation-delay: .12s; } .menubtns button:nth-child(4) { animation-delay: .18s; } .menubtns button:nth-child(5) { animation-delay: .24s; }
+  @keyframes menuin { from { transform: translateX(-30px); opacity: 0; } }
+  .deckbox { text-align: center; padding: 4px 8px; }
+  .deckbox h3 { margin: 0 0 6px; color: var(--hi); font-size: 17px; text-shadow: 0 2px 0 var(--ink); }
+  .deckhero { position: relative; height: 150px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 8px;
+              background: radial-gradient(ellipse at 50% 85%, #ffd86055, transparent 60%); }
+  .deckhero img { width: 128px; image-rendering: pixelated; animation: idle 2.6s ease-in-out infinite; transform-origin: 50% 100%; filter: drop-shadow(0 6px 0 #0006); }
+  .dhname { position: absolute; top: 0; left: 0; right: 0; font-size: 14px; font-weight: 600; }
+  .deckbox select { width: 100%; }
+  #deckinfo { margin-top: 6px; min-height: 18px; }
+  .subpanel { position: relative; width: min(560px, 100%); padding: 4px 10px; margin-top: 10px; animation: menuin .3s ease-out; }
+  .subpanel[hidden] { display: none; }
+  .subpanel h3 { margin: 0 0 8px; color: var(--hi); font-size: 18px; text-shadow: 0 2px 0 var(--ink); }
+  .subpanel label { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  .subpanel label select, .subpanel label input { flex: 1; min-width: 0; }
+  .subpanel .btns { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+  .subpanel .btns .big { flex: 1; }
+  .friendgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .friendgrid p { margin: 0 0 6px; }
+  .friendgrid .big { width: 100%; }
+  #title .mascots { margin-top: auto; padding-top: 14px; }
   .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: min(760px, 100%); }
   .menu .panel { padding: 2px 6px; }
   .menu h3 { margin: 0 0 8px; font-size: 17px; font-weight: 600; color: var(--hi); text-shadow: 0 2px 0 var(--ink); }
@@ -346,6 +376,8 @@
   }
   @media (max-width: 640px) {
     .menu { grid-template-columns: 1fr; }
+    .mainmenu { grid-template-columns: 1fr; gap: 12px; } .deckhero { height: 100px; } .deckhero img { width: 84px; } button.big { min-height: 48px; font-size: 17px; }
+    .friendgrid { grid-template-columns: 1fr; } .profile input { width: 110px; }
     .logo h1 { font-size: 28px; } .logo h1 .gname { font-size: 17px; } .logo img { width: 96px; height: 80px; }
     .mascots img { width: 34px; }
     .tstep .tpic .card { --s: 1.5; } .tstep .tpic.big .card { --s: 2.4; } .tstep { min-height: 0; } .tstep .ttext { font-size: 14.5px; }
@@ -375,7 +407,7 @@
     <div class="herorow">
       <div class="piles"><span class="pile" id="mdeck"></span><span class="pile" id="mgrave"></span><span class="muted" id="minfo"></span></div>
       <div class="hero" id="mface"><div class="portrait"><img id="mheroimg" alt=""></div><div class="hpgem px-text" id="mhp"></div><div class="heroname px-text" id="mname"></div></div>
-      <div class="piles right"><button id="logbtn">บันทึก</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button></div>
+      <div class="piles right"><button id="quitbtn" title="ออกจากเกม">⏏ ออก</button><button id="logbtn">บันทึก</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button></div>
     </div>
     <div class="actionbar"><span id="abil"></span><span id="paybox"></span><button id="cancel" style="display:none">ยกเลิก</button></div>
     <div class="row hand" id="mhand"></div>
@@ -387,35 +419,42 @@
 </div>
 
 <div id="title">
+  <div class="tbar">
+    <label class="profile panel"><img src="img/hum_hans.png" alt="" id="profimg"><span>ผู้เล่น</span><input id="myname" maxlength="16" placeholder="ตั้งชื่อ"></label>
+    <span class="grow"></span>
+    <button id="soundtitle" title="เปิด/ปิดเสียง">🔊 เสียง</button>
+  </div>
   <div class="logo"><img src="img/ui_logo.png" alt=""><h1><span class="gname">Battle of Banmo</span><small>เกมการ์ด 9 เผ่า · ทิ้งการ์ดเป็น gem · อัญเชิญ · ตีให้ HP ศัตรูหมด</small></h1></div>
-  <div class="mascots" id="mascots"></div>
-  <div class="menu">
-    <div class="panel wide">
-      <label><span>ชื่อ</span><input id="myname" maxlength="16" placeholder="ผู้เล่น"></label>
-      <label><span>เดค</span><span class="deckrow" style="flex:1"><select id="mydeck"></select><button id="openbuilder">จัดเดค</button></span></label>
+  <div class="mainmenu">
+    <div class="menubtns">
+      <button class="main big" data-panel="pbot">⚔ เล่นกับบอท</button>
+      <button class="main big" data-panel="pfriend">☺ เล่นกับเพื่อน</button>
+      <button class="big" id="openbuilder">▤ จัดเดค</button>
+      <button class="big" id="opentutor">? สอนเล่น</button>
+      <button class="big" id="practice">✦ ฝึกเล่น (มีคำแนะนำ)</button>
     </div>
-    <div class="panel">
-      <h3>เล่นกับบอท</h3>
-      <label><span>เดคบอท</span><select id="botdeck"></select></label>
-      <button class="main" id="go" style="width:100%">เริ่มเล่น</button>
-    </div>
-    <div class="panel">
-      <h3>เล่นกับเพื่อน (ออนไลน์)</h3>
-      <button class="main" id="host" style="width:100%">สร้างห้อง</button>
-      <label><input id="joincode" maxlength="5" placeholder="รหัสห้อง 5 ตัว" style="text-transform:uppercase"><button id="join">เข้าห้อง</button></label>
-      <div id="netmsg" class="muted"></div>
-    </div>
-    <div class="panel wide" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span style="flex:1;min-width:200px">เพิ่งเคยเล่น? เรียนกติกา 8 ขั้นสั้น ๆ แล้วลองเล่นกับบอทพร้อมคำแนะนำ</span>
-      <button id="soundtitle" title="เปิด/ปิดเสียง">🔊 เสียง</button>
-      <button class="main" id="opentutor">สอนเล่น</button><button id="practice">ฝึกเล่น (มีคำแนะนำ)</button>
-    </div>
-    <div class="panel wide help">
-      เดค 50 ใบจัดอัตโนมัติจากสายที่เลือก · HP 5 · จั่วเริ่ม 5 · ต้นเทิร์นจั่ว 2 ใบ · เทิร์นแรกของเกมโจมตีไม่ได้<br>
-      <b>อัญเชิญ:</b> แตะมอนในมือ → เลือกการ์ดที่จะทิ้งจ่าย gem → กดอัญเชิญ · <b>โจมตี:</b> แตะมอนที่เรืองเขียว → แตะเป้าหมายที่ขอบแดง<br>
-      <b>เวทปกติ:</b> แตะที่การ์ด · <b>เวทสวน:</b> เกมจะถามตอนถูกโจมตี · <b>ดูการ์ดขยาย:</b> ชี้เมาส์ หรือกดค้างบนมือถือ
+    <div class="deckbox panel">
+      <h3>เดคของฉัน</h3>
+      <div class="deckhero"><img id="deckheroimg" alt=""><div class="dhname px-text" id="deckheroname"></div></div>
+      <select id="mydeck"></select>
+      <div class="muted" id="deckinfo"></div>
     </div>
   </div>
+  <div class="subpanel panel" id="pbot" hidden>
+    <h3>เล่นกับบอท</h3>
+    <label><span>เดคบอท</span><select id="botdeck"></select></label>
+    <div class="btns"><button class="main big" id="go">เริ่มเล่น</button><button data-close>ปิด</button></div>
+  </div>
+  <div class="subpanel panel" id="pfriend" hidden>
+    <h3>เล่นกับเพื่อน (ออนไลน์)</h3>
+    <div class="friendgrid">
+      <div><p class="muted">สร้างห้องแล้วส่งรหัสให้เพื่อน</p><button class="main big" id="host">สร้างห้อง</button></div>
+      <div><p class="muted">มีรหัสจากเพื่อน?</p><label><input id="joincode" maxlength="5" placeholder="รหัส 5 ตัว" style="text-transform:uppercase"><button class="main" id="join">เข้าห้อง</button></label></div>
+    </div>
+    <div id="netmsg" class="muted"></div>
+    <div class="btns"><button data-close>ปิด</button></div>
+  </div>
+  <div class="mascots" id="mascots"></div>
 </div>
 
 <div id="tutor" hidden><div class="tbox">
@@ -1124,9 +1163,37 @@ $("mascots").innerHTML = MASCOTS.map((m, i) => `<img src="img/${m}.png" alt="" s
 $("myname").value = store.get("name") || "";
 if (store.get("deck") && [...$("mydeck").options].some((o) => o.value === store.get("deck"))) $("mydeck").value = store.get("deck");
 const remember = () => { store.set("name", $("myname").value.trim()); store.set("deck", $("mydeck").value); };
+setTimeout(() => showDeckHero(), 0);
+// หน้าแรก: เปิดแผงย่อยของโหมดเล่น
+for (const b of document.querySelectorAll("[data-panel]")) b.onclick = () => { for (const p of document.querySelectorAll(".subpanel")) p.hidden = p.id !== b.dataset.panel; SFX.play("click"); };
+for (const b of document.querySelectorAll("[data-close]")) b.onclick = () => (b.closest(".subpanel").hidden = true);
+// รูปหัวหน้าของเดคที่เลือก (หัวหน้า cost สูงสุด ไม่มีก็พลทหารเผ่า)
+function deckHero(spec) {
+  const ids = typeof spec === "string" ? [] : spec.ids || ALL.filter((c) => c.archs.has(spec.arch)).map((c) => c.id);
+  const cs = ids.map((id) => CARD[id]).filter(Boolean);
+  const lead = cs.filter((c) => c.leader).sort((a, b) => b.cost - a.cost)[0];
+  if (lead) return lead.id;
+  const race = {}; for (const c of cs) if (c.type === "มอน") race[c.id.slice(0, 3)] = (race[c.id.slice(0, 3)] || 0) + 1;
+  const top = Object.entries(race).sort((a, b) => b[1] - a[1])[0]; return top ? `${top[0]}-GEN-01` : "HUM-GEN-01";
+}
+function showDeckHero() {
+  const spec = deckSpec($("mydeck").value), id = deckHero(spec), r = ROW[id];
+  if (r && r.art) { $("deckheroimg").src = `img/${r.art}.png`; $("profimg").src = `img/${r.art}.png`; }
+  $("deckheroname").textContent = r ? r.name : "";
+  $("deckinfo").textContent = typeof spec === "string" ? spec : spec.ids ? `เดคที่จัดเอง · ${spec.ids.length} ใบ` : `จัดอัตโนมัติ · สาย${spec.arch}`;
+}
+$("mydeck").addEventListener("change", () => { showDeckHero(); remember(); });
+$("quitbtn").onclick = () => {
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="box panel" style="text-align:center"><h2 class="px-text">ออกจากเกม?</h2><p>${role === "host" || role === "guest" ? "จะออกจากห้อง และเกมนี้จะจบ" : "เกมนี้จะจบ และกลับไปหน้าแรก"}</p>
+    <div class="btns"><button class="main" id="qyes">ออก</button><button id="qno">เล่นต่อ</button></div></div>`;
+  m.querySelector("#qyes").onclick = () => { forgetRoom(); try { conn && conn.close(); } catch {} location.href = location.pathname; };
+  m.querySelector("#qno").onclick = () => m.remove();
+  document.body.appendChild(m);
+};
 $("go").onclick = () => {
   const mine = deckSpec($("mydeck").value), bot = deckSpec($("botdeck").value);
-  if (typeof mine === "string" || typeof bot === "string") return netmsg(esc(typeof mine === "string" ? mine : bot));
+  if (typeof mine === "string" || typeof bot === "string") { $("deckinfo").textContent = typeof mine === "string" ? mine : bot; return; }
   role = "bot"; remember();
   newSession(["local", "bot"], [myName(), "บอท"], [mine, bot]);
 };
@@ -1307,11 +1374,11 @@ function guestLost() {
 $("host").onclick = () => { if (!peer) { peer = "starting"; hostRoom(); } };
 $("join").onclick = () => { if (!peer) { peer = "starting"; joinRoom($("joincode").value); } };
 const roomParam = new URLSearchParams(location.search).get("room");
-if (roomParam) { $("joincode").value = roomParam.toUpperCase(); netmsg("ใส่ชื่อ เลือกเดค แล้วกด <b>เข้าห้อง</b>"); }
+if (roomParam) { $("joincode").value = roomParam.toUpperCase(); $("pfriend").hidden = false; netmsg("ใส่ชื่อ เลือกเดค แล้วกด <b>เข้าห้อง</b>"); }
 (() => {                                                              // เคยอยู่ในห้องในแท็บนี้: เสนอกลับเข้าห้องเดิม
   let saved = null; try { saved = JSON.parse(sstore.get("room") || "null"); } catch {}
   if (!saved || !saved.code || location.hash) return;
-  $("joincode").value = saved.code;
+  $("joincode").value = saved.code; $("pfriend").hidden = false;
   netmsg(`คุณเพิ่งอยู่ในห้อง <span class="code">${esc(saved.code)}</span> <button class="main" id="rejoin">กลับเข้าห้องเดิม</button> <button id="forget">ไม่ต้อง</button>`);
   $("rejoin").onclick = () => { if (!peer) { peer = "starting"; joinRoom(saved.code); } };
   $("forget").onclick = () => { forgetRoom(); netmsg(""); };
@@ -1404,7 +1471,7 @@ function openBuilder() {
   if (!$("frace").options.length) fillFilters();
   const v = $("mydeck").value; loadInto(v.startsWith("d:") ? +v.slice(2) : null); renderGrid(true);
 }
-function closeBuilder() { $("builder").hidden = true; $("title").style.display = ""; refreshDeckSelects(); }
+function closeBuilder() { $("builder").hidden = true; $("title").style.display = ""; refreshDeckSelects(); showDeckHero(); }
 $("openbuilder").onclick = openBuilder;
 $("bclose").onclick = closeBuilder;
 $("bmore").onclick = () => { B.page++; renderGrid(false); };
