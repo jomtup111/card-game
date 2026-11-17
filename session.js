@@ -149,6 +149,12 @@
     async react(d, info) {
       const i = this.G.P.indexOf(d), a = this.G.other(d);
       if (this.seats[i] === "bot") return this.G.botReact(d, info);
+      // ผู้เล่นคน: ไม่ถามเวทสวนที่ใช้แล้วผลการต่อสู้ไม่เปลี่ยน · ไม่เหลือตัวเลือก = ไม่ถาม
+      if (info.attacker) {
+        const keep = info.opts.filter((o) => this.G.reactUseful(d, o, info));
+        if (!keep.length) return null;
+        info = { ...info, opts: keep };
+      }
       this.push();
       const payload = {
         head: info.etb ? `${a.name} อัญเชิญ ${info.etb.name}` : info.spell ? `${a.name} ร่ายเวท ${info.spell.name}` : `${info.attacker.name} โจมตี ${info.targetIsPlayer ? "คุณ (ผู้เล่น)" : info.target.name}`,

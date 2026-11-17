@@ -1005,11 +1005,39 @@
       if (toPlayer) for (const c of d.hand) if (c.type === "มอน" && c.kw["พรีกาย"]) opts.push({ kind: "bodyguard", card: c });
       return opts;
     }
-    async doReact(d, toPlayer, target, att, react) {
+    // เวทสวนตัวนี้เปลี่ยนผลการต่อสู้ไหม (ใช้กรองตัวเลือกให้ผู้เล่นคน — บอทไม่ใช้ สมดุลไม่เปลี่ยน)
+    //   ประเมินแบบเดียวกับ combat(): ใครตาย / ใครรอด · ไม่แน่ใจ = ถือว่ามีผล (ยังเสนอ)
+    reactUseful(d, opt, info) {
+      if (opt.kind !== "counter" || info.targetIsPlayer || !info.target || !info.attacker) return true;
+      const r = opt.card.counter[2], t = info.target, att = info.attacker, a = this.other(d);
+      const A = info.atkPow != null ? info.atkPow : this.eff(a, att, true, t);
+      const D = this.eff(d, t, false, att) + (att.h.pierce ? 0 : this.arm(t)) + (t.h.onHitPow || 0) - (att.h.weaken || 0);
+      const poisonA = att.has("พิษ"), poisonT = t.has("พิษ"), fly = att.has("บิน");
+      const outcome = (bonus) => {
+        let defDies = poisonA || A >= D + bonus;
+        if (defDies && t.hitTurn !== this.turn && t.h.firstHit) defDies = false;
+        const attDies = (poisonT || D + bonus > A) && !(fly && !poisonT);
+        return { defDies, attDies };
+      };
+      const now = outcome(0), wouldDie = now.defDies && !t.kw["โล่แสง"] && !t.save && !d.immune;
+      switch (r.t) {
+        case "defbuff": {
+          if (r.grow) return true;
+          const b = r.n * (r.perUpgrade ? t.attached.length : r.per ? this.count(d, r.per, "field", t) : 1), aft = outcome(b);
+          return aft.defDies !== now.defDies || aft.attDies !== now.attDies;
+        }
+        case "survive": case "undying": case "split": case "eject": case "mutual": return wouldDie;
+        case "shield": return wouldDie && !t.kw["โล่แสง"];
+        case "keepshield": return now.defDies && !!t.kw["โล่แสง"];
+        case "revenge": return !now.defDies && !now.attDies;
+      }
+      return true;
+    }
+    async doReact(d, toPlayer, target, att, react, atkPow) {
       if (!react) return null;
       const opts = this.reactOptions(d, toPlayer, target, att);
       if (!opts.length) return null;
-      const choice = await react(d, { opts, targetIsPlayer: toPlayer, target, attacker: att });
+      const choice = await react(d, { opts, targetIsPlayer: toPlayer, target, attacker: att, atkPow });
       if (!choice) return null;
       this.emit({ t: "react", id: choice.card.id, by: this.P.indexOf(d) });
       d.hand.splice(d.hand.indexOf(choice.card), 1); d.grave.push(choice.card); d.reacted = true;
@@ -1206,7 +1234,7 @@
       this.emit({ t: "gang", as: us.map((u) => u.uid), b: t.uid, by: this.P.indexOf(p) });
       this.log(`⚔ ${us.map((u) => u.name).join(" + ")} รุมตี ${t.name}`);
       const lead = us.reduce((a, b) => (this.eff(p, a) >= this.eff(p, b) ? a : b));
-      const r = await this.doReact(e, false, t, lead, react);
+      const r = await this.doReact(e, false, t, lead, react, this.gangPower(p, us, t));
       if (r) { const res = this.resolveReact(e, p, lead, t, r); if (res.cancel) { this.checkEnd(); return null; } if (res.t !== t) { await this.combat(p, lead, e, res.t, res); this.checkEnd(); return null; } }
       const A = this.gangPower(p, us, t), D = this.eff(e, t, false, lead) + this.arm(t);
       const poison = us.some((u) => u.has("พิษ"));
