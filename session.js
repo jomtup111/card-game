@@ -12,6 +12,8 @@
     // o: { cards: [Card], decks: [สาย, สาย], names, seats, seed, onView(i, view), onLog(s), ask(i, payload) → Promise<ตำแหน่งตัวเลือก|null>, botDelay }
     constructor(o) {
       Object.assign(this, { botDelay: 600, watch: false }, o);
+      // บันทึกสำหรับเล่นซ้ำ (รายงานบัค): seed + เดค + ทุกคำสั่งของผู้เล่นคน + คำตอบเวทสวน → เกมเดิมเป๊ะ
+      this.rec = { seed: o.seed, decks: o.decks, seats: o.seats, names: o.names, levels: [], acts: [], answers: [] };
       // เดค: ชื่อสาย (จัดอัตโนมัติ) | { arch } | { name, ids: [รหัสการ์ด] } (จัดเอง ต้องผ่าน validateDeck มาแล้ว)
       const byId = new Map(o.cards.map((c) => [c.id, c]));
       const mk = (d) => (d && d.ids ? d.ids.map((id) => byId.get(id)) : E.buildDeck(o.cards, typeof d === "string" ? d : d.arch));
@@ -33,6 +35,7 @@
       this.reactFn = (d, info) => this.react(d, info);
     }
     start() {
+      this.rec.levels = this.G.P.map((p) => [p.level || null, p.bonusDraw || 0]);
       this.G.P.forEach((p, i) => { if (this.seats[i] === "bot") { this.G.botMulligan(p); this.mullDone[i] = true; } });
       if (this.mullDone.every(Boolean)) return this.begin();
       this.push();
@@ -95,6 +98,7 @@
     async act(i, a) {
       const G = this.G, p = G.P[i], e = G.other(p);
       if (!a || typeof a !== "object") return "คำสั่งไม่ถูกต้อง";
+      if (this.rec.acts.length < 5000) this.rec.acts.push([i, a]);
       if (this.phase === "mull") {
         if (a.t !== "mull" || this.mullDone[i]) return "รออีกฝ่ายเลือก mulligan";
         const cards = [...new Set(a.idx || [])].map((k) => p.hand[k]).filter(Boolean);
@@ -162,7 +166,7 @@
         sub: info.etb ? `ยกเลิกสกิลลงสนาม: ${info.etb.ab}` : info.spell ? info.spell.ab : "เลือกเวทสวนเพื่อตอบโต้ หรือทิ้งมอนพรีกายจากมือรับแทน",
         opts: info.opts.map((o) => ({ id: o.card.id, kind: o.kind })),
       };
-      const k = await this.ask(i, payload);
+      const k = await this.ask(i, payload); this.rec.answers.push(k);
       return Number.isInteger(k) && info.opts[k] ? info.opts[k] : null;
     }
   }

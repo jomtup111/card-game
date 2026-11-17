@@ -584,7 +584,7 @@
 <div id="app">
   <div id="board">
     <div class="opphand" id="ehand" title="การ์ดในมือศัตรู"></div>
-    <div class="topbtns"><button id="logbtn" title="บันทึกเกม">📜</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button><button id="setbtn" title="ตั้งค่า">⚙</button><button id="quitbtn" title="ออกจากเกม">⏏</button></div>
+    <div class="topbtns"><button id="logbtn" title="บันทึกเกม">📜</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button><button id="bugbtn" title="รายงานบัค">🐞</button><button id="setbtn" title="ตั้งค่า">⚙</button><button id="quitbtn" title="ออกจากเกม">⏏</button></div>
     <div class="mat"><img class="emblem" src="img/ui_emblem.png" alt=""></div>
     <div class="herorow opp">
       <div class="piles"><span class="pile" id="edeck"></span><span class="pile" id="egrave"></span><span class="muted" id="earch"></span></div>
@@ -1607,6 +1607,40 @@ addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt 
 $("installbtn").onclick = async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; $("installbtn").hidden = true; };
 addEventListener("appinstalled", () => { $("installbtn").hidden = true; });
 
+// ---------------------------------------------------------------- รายงานบัค: คัดลอกข้อความ + รหัสเล่นซ้ำ ไปวางในแชต
+function bugText(note) {
+  const lines = ["[Battle of Banmo · รายงานบัค]", `เวลา: ${new Date().toLocaleString("th-TH")} · ${role || "-"} · จอ ${innerWidth}×${innerHeight}`];
+  if (note) lines.push("อาการ: " + note);
+  if (V) {
+    const f = (side) => side.field.map((x) => `${unitCard(x).name}(${x.power}${x.status && x.status.length ? " " + x.status.join("/") : ""})`).join(", ") || "-";
+    lines.push(`เทิร์น ${V.turn} · ${V.phase} · ${V.myTurn ? "ตาเรา" : "ตาอีกฝ่าย"} · โหมด ${mode}`,
+      `เรา HP ${V.me.hp} · มือ: ${V.me.hand.map((h) => ROW[h.id] ? ROW[h.id].name : h.id).join(", ")}`, `สนามเรา: ${f(V.me)}`,
+      `${V.opp.name} HP ${V.opp.hp} · มือ ${V.opp.handCount} ใบ`, `สนามศัตรู: ${f(V.opp)}`);
+  }
+  const log = [...$("log").children].slice(-40).map((d) => d.textContent).join("\n");
+  lines.push("— บันทึก 40 บรรทัดล่าสุด —", log);
+  if (S && S.rec) {
+    try { lines.push("— รหัสเล่นซ้ำ —", "BANMO1:" + btoa(unescape(encodeURIComponent(JSON.stringify(S.rec))))); } catch (e) { lines.push("(สร้างรหัสเล่นซ้ำไม่ได้: " + e + ")"); }
+  } else lines.push("(ฝั่งเพื่อนไม่มีรหัสเล่นซ้ำ — ให้เจ้าของห้องกดรายงานจะได้ข้อมูลครบกว่า)");
+  return lines.join("\n");
+}
+function openBug() {
+  if (document.querySelector(".bugbox")) return;
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="box panel bugbox" style="width:min(520px,100%)"><h2 class="px-text">🐞 รายงานบัค</h2>
+    <p class="muted" style="font-size:13px">เล่าสั้น ๆ ว่าเจออะไร แล้วกด <b>คัดลอก</b> → วางในแชตกับผู้พัฒนา (มีบันทึกเกมและรหัสเล่นซ้ำแนบไปด้วย)</p>
+    <textarea id="bugnote" rows="3" style="width:100%;font:inherit" placeholder="เช่น ตีตัว power 3 แล้วตัวเราตายทั้งที่ power 4"></textarea>
+    <div class="muted" id="bugmsg" style="min-height:20px;margin-top:4px"></div>
+    <div class="btns"><button class="main" id="bugcopy">คัดลอก</button><button id="bugclose">ปิด</button></div></div>`;
+  m.querySelector("#bugclose").onclick = () => m.remove();
+  m.querySelector("#bugcopy").onclick = async () => {
+    const t = bugText(m.querySelector("#bugnote").value.trim());
+    try { await navigator.clipboard.writeText(t); m.querySelector("#bugmsg").textContent = "คัดลอกแล้ว ✓ วางในแชตได้เลย"; }
+    catch { const ta = m.querySelector("#bugnote"); ta.value = t; ta.rows = 10; ta.select(); m.querySelector("#bugmsg").textContent = "คัดลอกอัตโนมัติไม่ได้ — ข้อความอยู่ในช่องด้านบน กด Ctrl+C / ⌘C"; }
+  };
+  document.body.appendChild(m); m.querySelector("#bugnote").focus();
+}
+$("bugbtn").onclick = (e) => { e.stopPropagation(); openBug(); };
 function openSettings() {
   if (document.querySelector(".setbox")) return;
   const m = document.createElement("div"); m.className = "modal";
