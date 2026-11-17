@@ -474,6 +474,17 @@
     #endturn { width: 64px; height: 64px; font-size: 12px; right: 8px; top: 50%; bottom: auto; transform: translateY(-50%); }
     .topbtns button { width: 34px; height: 30px; font-size: 14px; }
   }
+  /* ================= พรมสนาม (ภาพพิกเซล ui_mat) ================= */
+  #board { background: radial-gradient(ellipse 85% 75% at 50% 50%, transparent 55%, #0000008c); }
+  .mat { position: absolute; left: var(--matx, 8%); right: var(--matx, 8%); top: var(--mt, 30%); height: var(--mh, 40%); z-index: -1;
+         border: 48px solid transparent; border-image: url(img/ui_mat.png) 16 / 48px round; background: #534369 url(img/ui_felt.png) 0 0 / 48px 48px; background-blend-mode: soft-light;
+         background-clip: padding-box; box-shadow: 0 14px 30px #000a; image-rendering: pixelated; }
+  .mat::after { content: ""; position: absolute; inset: -36px; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, #ffffff10, transparent 65%); }
+  .mat .emblem { position: absolute; left: 50%; top: 50%; width: min(260px, 40%); transform: translate(-50%, -50%); opacity: .55; image-rendering: pixelated; pointer-events: none; }
+  .row.field { background: none; }
+  .midline::before { left: 4%; right: 4%; }
+  @media (max-width: 640px) { .mat { border-width: 24px; border-image-width: 24px; } }
+  @media (max-height: 560px) { .mat { border-width: 24px; border-image-width: 24px; } }
   /* ================= แถบประวัติ + โชว์การ์ดศัตรู ================= */
   #hist { position: fixed; left: 10px; top: 70px; z-index: 11; display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
   #hist:empty { display: none; }
@@ -556,6 +567,7 @@
   <div id="board">
     <div class="opphand" id="ehand" title="การ์ดในมือศัตรู"></div>
     <div class="topbtns"><button id="logbtn" title="บันทึกเกม">📜</button><button id="soundbtn" title="เปิด/ปิดเสียง">🔊</button><button id="setbtn" title="ตั้งค่า">⚙</button><button id="quitbtn" title="ออกจากเกม">⏏</button></div>
+    <div class="mat"><img class="emblem" src="img/ui_emblem.png" alt=""></div>
     <div class="herorow opp">
       <div class="piles"><span class="pile" id="edeck"></span><span class="pile" id="egrave"></span><span class="muted" id="earch"></span></div>
       <div class="hero" id="eface"><div class="portrait"><img id="eheroimg" alt=""></div><div class="hpgem px-text" id="ehp"></div><div class="heroname px-text" id="ename"></div></div>
@@ -735,7 +747,7 @@ const MASCOTS = ["hum_hans", "hel_grib", "hea_luz", "spi_mushy", "bea_nutty", "d
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const u = (x, y, w, h, extra = "") => `style="--x:${x};--y:${y};--w:${w};--h:${h};${extra}"`;
-const SET = (() => { let o = {}; try { o = JSON.parse(localStorage.getItem("settings") || "{}"); } catch {} return Object.assign({ vol: 70, speed: 1, hints: false, tips: true }, o); })();
+const SET = (() => { let o = {}; try { o = JSON.parse(localStorage.getItem("settings") || "{}"); } catch {} return Object.assign({ vol: 70, music: 40, speed: 1, hints: false, tips: true }, o); })();
 const BOTDELAY = 600;
 const saveSet = () => { try { localStorage.setItem("settings", JSON.stringify(SET)); } catch {} };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms * SET.speed));
@@ -939,8 +951,57 @@ const SFX = (() => {
     setVol(v) { SET.vol = v; if (master) master.gain.value = (v / 70) ** 1.5; if (v > 0 && !on) this.toggle(); if (v === 0 && on) this.toggle(); },
   };
 })();
+// เพลงประกอบชิปทูน (สร้างสดด้วย Web Audio ไม่ใช้ไฟล์): เมนู = ช้า สบาย ๆ · ในเกม = เร็วขึ้น มีกลอง
+const MUSIC = (() => {
+  let ctx = null, gain = null, timer = 0, track = null, step = 0, next = 0, unlocked = false;
+  const mid = (m) => 440 * 2 ** ((m - 69) / 12);
+  const TR = {
+    menu: { bpm: 88, chords: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]], lead: [76, null, 74, 72, 74, null, 72, 69, 72, null, 71, 67, 69, null, null, null], drum: false },
+    battle: { bpm: 122, chords: [[50, 53, 57], [46, 50, 53], [48, 52, 55], [45, 49, 52]], lead: [74, 74, 77, null, 76, 74, 72, null, 74, null, 70, 72, 73, null, 69, null], drum: true },
+  };
+  function note(m, t, dur, type, vol) {
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(mid(m), t);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(gain); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function hat(t, vol) {
+    const b = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); f.type = "highpass"; f.frequency.value = 6000; g.gain.value = vol;
+    src.buffer = b; src.connect(f).connect(g).connect(gain); src.start(t);
+  }
+  function tick() {
+    const T = TR[track]; if (!T) return; const st = 60 / T.bpm / 2;          // 1 step = โน้ตเขบ็ต 1 ชั้น
+    while (next < ctx.currentTime + 0.25) {
+      const bar = Math.floor(step / 8) % 4, c = T.chords[bar], s8 = step % 8, s16 = step % 16;
+      if (s8 === 0 || s8 === 4 || (T.drum && s8 === 6)) note(c[0] - 12, next, st * 1.8, "triangle", 0.16);
+      note(c[s8 % 3] + 12, next, st * 0.9, "square", 0.022);
+      const l = T.lead[s16]; if (l != null && Math.floor(step / 16) % 2 === 1) note(l, next, st * 1.6, "triangle", 0.06);
+      if (T.drum) { if (s8 % 2 === 1) hat(next, 0.035); if (s8 === 0 || s8 === 4) note(36, next, 0.12, "sine", 0.18); }
+      next += st; step++;
+    }
+  }
+  const level = () => (SFX.on ? (SET.music / 100) ** 1.5 * 0.9 : 0);
+  return {
+    unlock() { if (unlocked) return; unlocked = true; try { ctx = new (window.AudioContext || window.webkitAudioContext)(); gain = ctx.createGain(); gain.gain.value = level(); gain.connect(ctx.destination); } catch { ctx = null; } },
+    play(name) {
+      if (!ctx || FAST) return; if (ctx.state === "suspended") ctx.resume();
+      gain.gain.value = level(); if (track === name) return;
+      track = name; step = 0; next = ctx.currentTime + 0.1; clearInterval(timer); timer = setInterval(tick, 60);
+    },
+    stop() { track = null; clearInterval(timer); },
+    refresh() { if (gain) gain.gain.setTargetAtTime(level(), ctx.currentTime, 0.05); },
+    get track() { return track; },
+  };
+})();
+addEventListener("pointerdown", () => MUSIC.unlock(), { capture: true, once: true });
+addEventListener("keydown", () => MUSIC.unlock(), { capture: true, once: true });
+setInterval(() => {                                                       // เลือกเพลงตามหน้าที่เปิดอยู่
+  const inGame = V && $("title").style.display === "none" && $("builder").hidden && $("tutor").hidden;
+  if (SET.music <= 0 || !SFX.on) { MUSIC.refresh(); return; }
+  MUSIC.play(inGame && V.phase !== "over" ? "battle" : "menu");
+}, 700);
 function soundIcons() { $("soundbtn").textContent = SFX.on ? "🔊" : "🔇"; $("soundtitle").textContent = (SFX.on ? "🔊" : "🔇") + " เสียง"; }
-$("soundbtn").onclick = $("soundtitle").onclick = (e) => { e.stopPropagation(); SFX.toggle(); soundIcons(); SFX.play("click"); };
+$("soundbtn").onclick = $("soundtitle").onclick = (e) => { e.stopPropagation(); SFX.toggle(); soundIcons(); SFX.play("click"); MUSIC.refresh(); };
 soundIcons();
 
 // ---------------------------------------------------------------- อนิเมชัน
@@ -1169,7 +1230,7 @@ function render() {
     el.addEventListener("pointerdown", (ev) => startDrag(ev, el, h, k));
     hand.appendChild(el);
   });
-  fanHand();
+  fanHand(); placeMat();
   // สกิลที่กดใช้เอง (ฟื้นคืน / รีไซเคิล)
   $("abil").innerHTML = "";
   if (V.myTurn && mode === "idle") for (const ab of V.me.abilities || []) {
@@ -1205,6 +1266,14 @@ function render() {
   }
 }
 
+// พรมสนาม: คลุมจากสนามศัตรูถึงสนามเรา
+function placeMat() {
+  const b = $("board"), e = $("efield"), m = $("mfield"), mat = b.querySelector(".mat"); if (!mat || !e.offsetHeight) return;
+  const pad = innerWidth < 640 || innerHeight < 560 ? 26 : 50, top = e.offsetTop - pad, bot = m.offsetTop + m.offsetHeight + pad;
+  mat.style.setProperty("--mt", top + "px"); mat.style.setProperty("--mh", bot - top + "px");
+  const side = innerWidth < 640 ? 4 : Math.max(16, (b.clientWidth - Math.max(innerWidth * 0.62, 7 * 56 * parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ms") || 1.5) + 140)) / 2);
+  mat.style.setProperty("--matx", side + "px");
+}
 // มือเรียงเป็นพัด
 function fanHand() {
   const hand = $("mhand"), cards = [...hand.children], n = cards.length; if (!n) return;
@@ -1212,7 +1281,7 @@ function fanHand() {
   const total = cw + gap * (n - 1), x0 = (W - total) / 2, mid = (n - 1) / 2, spread = Math.min(5, 26 / Math.max(1, n));
   cards.forEach((el, k) => { el.style.left = x0 + gap * k + "px"; el.style.setProperty("--rot", `${(k - mid) * spread}deg`); el.style.setProperty("--dy", `${Math.abs(k - mid) ** 2 * 2.2}px`); el.style.zIndex = 10 + k; });
 }
-addEventListener("resize", () => requestAnimationFrame(fanHand));
+addEventListener("resize", () => requestAnimationFrame(() => { fanHand(); placeMat(); }));
 // ลากการ์ดจากมือขึ้นสนาม (= แตะเล่น) · ขยับไม่ถึง 10px ถือว่าแตะ
 let dragJustEnded = false;
 function startDrag(ev, el, h, k) {
@@ -1474,6 +1543,7 @@ function openSettings() {
   const seg = (k, opts) => `<span class="seg">${opts.map(([v, t]) => `<button data-k="${k}" data-v="${v}" class="${SET[k] === v ? "on" : ""}">${t}</button>`).join("")}</span>`;
   m.innerHTML = `<div class="box panel setbox"><h2 class="px-text">ตั้งค่า</h2>
     <div class="srow"><span>ความดังเสียง</span><input type="range" id="svol" min="0" max="100" step="5" value="${SFX.on ? SET.vol : 0}"><span class="sval" id="svolv"></span></div>
+    <div class="srow"><span>ความดังเพลง</span><input type="range" id="smus" min="0" max="100" step="5" value="${SET.music}"><span class="sval" id="smusv"></span></div>
     <div class="srow"><span>ความเร็วอนิเมชัน</span>${seg("speed", [[1.4, "ช้า"], [1, "ปกติ"], [0.5, "เร็ว"]])}</div>
     <div class="srow"><span>คำแนะนำในเกม</span>${seg("hints", [[true, "เปิด"], [false, "ปิด"]])}</div>
     <div class="srow"><span>ชี้การ์ดแล้วบอกเอฟเฟกต์</span>${seg("tips", [[true, "เปิด"], [false, "ปิด"]])}</div>
@@ -1481,8 +1551,11 @@ function openSettings() {
     <div class="keyhelp"><b>ปุ่มลัด (คอม):</b> <kbd>1</kbd>–<kbd>9</kbd> เล่นการ์ดในมือ · <kbd>Enter</kbd> ยืนยันอัญเชิญ / mulligan · <kbd>Space</kbd> จบเทิร์น · <kbd>Esc</kbd> หรือ<b>คลิกขวา</b> ยกเลิก</div>
     <div class="btns"><button class="main" id="setok">เสร็จ</button></div></div>`;
   const vol = m.querySelector("#svol"), vv = m.querySelector("#svolv"), showV = () => (vv.textContent = vol.value);
-  showV(); vol.oninput = () => { SFX.setVol(+vol.value); showV(); soundIcons(); };
+  showV(); vol.oninput = () => { SFX.setVol(+vol.value); showV(); soundIcons(); MUSIC.refresh(); };
   vol.onchange = () => { saveSet(); SFX.play("click"); };
+  const mus = m.querySelector("#smus"), mv = m.querySelector("#smusv"); mv.textContent = mus.value;
+  mus.oninput = () => { SET.music = +mus.value; mv.textContent = mus.value; MUSIC.unlock(); MUSIC.refresh(); if (SET.music > 0) MUSIC.play(MUSIC.track || "menu"); };
+  mus.onchange = () => saveSet();
   for (const b of m.querySelectorAll(".seg button")) b.onclick = () => {
     const k = b.dataset.k, v = b.dataset.v === "true" ? true : b.dataset.v === "false" ? false : +b.dataset.v;
     SET[k] = v; saveSet(); SFX.play("click");
