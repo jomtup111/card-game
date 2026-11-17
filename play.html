@@ -431,6 +431,54 @@
     #endturn { width: 64px; height: 64px; font-size: 12px; right: 8px; top: 50%; bottom: auto; transform: translateY(-50%); }
     .topbtns button { width: 34px; height: 30px; font-size: 14px; }
   }
+  /* ================= หน้า mulligan ================= */
+  #mullscreen { position: fixed; inset: 0; z-index: 18; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 12px;
+                background: radial-gradient(ellipse at 50% 55%, #2a2244ee, #120e20f4 75%); animation: mullin .35s ease-out; }
+  #mullscreen.out { animation: mullout .45s ease-in forwards; }
+  @keyframes mullin { from { opacity: 0; } }
+  @keyframes mullout { to { opacity: 0; } }
+  #mullscreen.out .mcards .card { transition: transform .45s ease-in; transform: translateY(70vh) scale(.5) !important; }
+  .faceoff { display: flex; align-items: center; gap: 22px; }
+  .faceoff .fo { text-align: center; }
+  .faceoff .fo .portrait { width: 96px; height: 96px; border: 12px solid transparent; border-image: url(img/ui_panel.png) 8 fill / 12px stretch; background: #2a2244;
+                           display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
+  .faceoff .fo img { width: 70px; image-rendering: pixelated; animation: idle 2.6s ease-in-out infinite; transform-origin: 50% 100%; }
+  .faceoff .fo.opp img { transform: scaleX(-1); animation: none; }
+  .faceoff .fo b { display: block; margin-top: 4px; font-size: 15px; }
+  .faceoff .vs { font-family: "Press Start 2P"; font-size: 26px; color: var(--hi); text-shadow: 0 3px 0 var(--ink); }
+  #mullscreen h2 { margin: 0; font-size: 26px; color: var(--hi); text-shadow: 0 3px 0 var(--ink); text-align: center; }
+  #mullscreen .sub { color: var(--dim); text-align: center; margin-top: -8px; }
+  .mcards { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .mcards .card { --s: var(--mcs, 2.2); transition: transform .15s; }
+  .mcards .card:hover { transform: translateY(-8px); }
+  .mcards .card.swap { transform: translateY(10px) rotate(-3deg); filter: brightness(.55) saturate(.6); }
+  .mcards .card.swap::before { content: "✕"; position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+                               font-size: calc(40px * var(--s)); font-weight: 700; color: #ff4058; text-shadow: 0 0 8px #000, 0 4px 0 #1b1630; pointer-events: none; }
+  #mullgo { min-width: 240px; min-height: 56px; font-size: 20px; }
+  #mullscreen .wait { font-size: 20px; color: var(--hi); animation: hlpulse 1.2s ease-in-out infinite; }
+  @media (max-width: 640px) { .mcards { gap: 6px; } .faceoff .fo .portrait { width: 70px; height: 70px; } .faceoff .fo img { width: 48px; } #mullscreen h2 { font-size: 20px; } }
+  @media (max-height: 560px) { .faceoff { display: none; } #mullscreen { gap: 8px; } }
+
+  /* ================= หน้าจบเกม ================= */
+  .endscreen { width: min(560px, 100%); text-align: center; padding: 6px 14px 10px; animation: endpop .4s cubic-bezier(.2, 1.5, .4, 1); }
+  @keyframes endpop { from { transform: scale(.6); opacity: 0; } }
+  .endscreen .ribbon { margin: -2px auto 10px; display: inline-block; padding: 6px 34px; font-family: "Press Start 2P"; font-size: 30px; color: #fff;
+                       text-shadow: 0 3px 0 #1b1630; box-shadow: 0 0 0 3px #1b1630, 0 6px 0 #1b1630; }
+  .endscreen.win .ribbon { background: linear-gradient(#f0c040, #c88e2a); }
+  .endscreen.lose .ribbon { background: linear-gradient(#8a5a7a, #4a3a5a); }
+  .endscreen .heroes { display: flex; justify-content: center; align-items: flex-end; gap: 40px; margin: 6px 0 12px; }
+  .endscreen .heroes div { text-align: center; font-size: 14px; }
+  .endscreen .heroes img { display: block; margin: 0 auto 4px; image-rendering: pixelated; }
+  .endscreen .heroes .w img { width: 96px; animation: idle 1.2s ease-in-out infinite; transform-origin: 50% 100%; }
+  .endscreen .heroes .l img { width: 72px; filter: grayscale(1) brightness(.6); transform: rotate(-14deg) translateY(6px); }
+  .endscreen .heroes .l b { color: var(--dim); position: relative; z-index: 1; }
+  .endscreen .heroes .w b { color: var(--hi); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 12px; }
+  .stats div { background: #1b1630c0; padding: 6px 4px; box-shadow: 0 0 0 2px #0008; }
+  .stats b { display: block; font-family: "Press Start 2P"; font-size: 18px; color: var(--hi); margin-bottom: 4px; }
+  .stats span { font-size: 12.5px; color: var(--dim); }
+  .endscreen .btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .endscreen .btns .main { min-width: 170px; min-height: 50px; font-size: 18px; }
 </style>
 </head>
 <body>
@@ -736,8 +784,18 @@ async function drain() {
   }
   draining = false;
 }
+let STATS = null;
+function countStats(prev, v) {
+  if (!prev || v.phase === "mull") STATS = { dealt: 0, taken: 0, summon: 0, spell: 0, kill: 0, lost: 0 };
+  for (const e of v.fx || []) { const mine = mineSeat(e.by, v); if (e.t === "summon" && mine) STATS.summon++; if (e.t === "cast" && mine) STATS.spell++; }
+  if (!prev || prev.phase === "mull") return;
+  STATS.dealt += Math.max(0, prev.opp.hp - v.opp.hp); STATS.taken += Math.max(0, prev.me.hp - v.me.hp);
+  const gone = (a, b) => a.filter((x) => !b.some((y) => y.uid === x.uid)).length;
+  STATS.kill += gone(prev.opp.field, v.opp.field); STATS.lost += gone(prev.me.field, v.me.field);
+}
 function applyView(v) {
   const prev = V, rects = {};
+  try { countStats(prev, v); } catch (e) { console.warn(e); }
   for (const el of document.querySelectorAll(".field .card[data-uid]")) rects[el.dataset.uid] = [el.getBoundingClientRect(), el];
   V = v;
   if (!V.myTurn && mode !== "mull") { mode = "idle"; sel = null; fodder = new Set(); }
@@ -754,7 +812,7 @@ function applyView(v) {
       const lost = prev[side].hp - V[side].hp;
       if (lost > 0) { SFX.play("hurt"); $("app").classList.remove("quake"); void $("app").offsetWidth; $("app").classList.add("quake"); const h = $(id); h.classList.remove("shake"); void h.offsetWidth; h.classList.add("shake"); floatText(h.getBoundingClientRect(), `-${lost}`); }
     }
-    if (V.phase === "play" && (prev.phase !== "play" || prev.turn !== V.turn)) { banner(V.myTurn ? "ตาคุณ!" : `ตาของ ${V.whoseTurn}`); if (V.myTurn) SFX.play("turn"); }
+    if (V.phase === "play" && (prev.phase !== "play" || prev.turn !== V.turn)) { banner(prev.phase === "mull" ? (V.myTurn ? "คุณเริ่มก่อน!" : `${V.whoseTurn} เริ่มก่อน`) : V.myTurn ? "ตาคุณ!" : `ตาของ ${V.whoseTurn}`); if (V.myTurn) SFX.play("turn"); }
   }
   if (V.phase === "over" && !overShown) { overShown = true; setTimeout(gameOver, FAST ? 0 : 700); }
   if (window.AUTOPLAY) setTimeout(autoStep, 30);
@@ -910,7 +968,30 @@ function hearts(n) { let h = ""; for (let i = 0; i < Engine.HP; i++) h += `<img 
 // ท่าขยับของมอนบนสนาม (CSS): ตัวบินลอยตัว · แช่แข็งหยุดนิ่งสีฟ้า
 const unitAnim = (x) => { const k = x.kws || []; return (k.includes("บิน") ? " flyer" : "") + ((x.status || []).some((s) => s.startsWith("❄")) ? " frozen" : "") +
   (k.includes("พรีกาย") ? " guard" : "") + (k.includes("ซ่อนตัว") ? " stealth" : "") + (k.includes("โล่แสง") ? " dshield" : ""); };
+// หน้า mulligan เต็มจอ: การ์ดใหญ่กลางจอ แตะ = เปลี่ยน (✕)
+function mullScreen() {
+  let m = $("mullscreen");
+  const want = V && V.phase === "mull";
+  if (!want) { if (m && !m.classList.contains("out")) { m.classList.add("out"); setTimeout(() => m.remove(), 460); } return; }
+  if (!m) { m = document.createElement("div"); m.id = "mullscreen"; document.body.appendChild(m); }
+  const hero = (h) => { const r = ROW[h]; return r && r.art ? `img/${r.art}.png` : ""; };
+  const n = V.me.hand.length, mcs = Math.max(0.9, Math.min(3.4, (innerWidth - 40 - (n - 1) * 12) / (n * 64), (innerHeight - (innerHeight < 560 ? 150 : 330)) / 96));
+  m.style.setProperty("--mcs", (Math.floor(mcs * 20) / 20).toFixed(2));
+  m.innerHTML = `<div class="faceoff"><div class="fo"><div class="portrait"><img src="${hero(V.me.hero)}" alt=""></div><b>${esc(V.me.name)}</b></div>
+      <div class="vs">VS</div><div class="fo opp"><div class="portrait"><img src="${hero(V.opp.hero)}" alt=""></div><b>${esc(V.opp.name)}</b></div></div>
+    <h2>${V.mullDone ? "เก็บมือนี้แล้ว" : "มือเริ่มต้น"}</h2>
+    <div class="sub">${V.mullDone ? "รออีกฝ่ายเลือก…" : "แตะการ์ดที่ไม่อยากได้เพื่อเปลี่ยน (เปลี่ยนได้ครั้งเดียว) · แนะนำเก็บมอน cost ต่ำไว้ลงต้นเกม"}</div>
+    <div class="mcards"></div>
+    ${V.mullDone ? `<div class="wait px-text">รออีกฝ่าย…</div>` : `<button class="main" id="mullgo">${fodder.size ? `เปลี่ยน ${fodder.size} ใบ` : "เก็บทั้งมือ"}</button>`}`;
+  V.me.hand.forEach((h, k) => {
+    const el = cardEl(ROW[h.id], { cls: (fodder.has(k) ? "swap " : "") + (V.mullDone ? "" : "click") }); el.dataset.id = h.id;
+    if (!V.mullDone) el.onclick = () => { fodder.has(k) ? fodder.delete(k) : fodder.add(k); SFX.play("click"); render(); };
+    m.querySelector(".mcards").appendChild(el);
+  });
+  const go = m.querySelector("#mullgo"); if (go) go.onclick = () => { go.disabled = true; act({ t: "mull", idx: [...fodder] }); };
+}
 function render() {
+  mullScreen();
   if (!V) return;
   $("ename").textContent = V.opp.name; $("mname").textContent = V.me.name;
   $("ehp").textContent = V.opp.hp; $("mhp").textContent = V.me.hp;
@@ -992,8 +1073,7 @@ function render() {
     $("paybox").innerHTML = `<span class="px-text">gem ${have}/${need}</span><button class="main" id="dosum" ${have >= need ? "" : "disabled"}>อัญเชิญ</button>`;
     $("dosum").onclick = () => act({ t: "summon", k: sel, f: [...fodder] });
   } else if (mode === "mull") {
-    $("paybox").innerHTML = `<button class="main" id="domull">${fodder.size ? `เปลี่ยน ${fodder.size} ใบ` : "เก็บทั้งมือ"}</button>`;
-    $("domull").onclick = () => { const idx = [...fodder]; act({ t: "mull", idx }); };
+    $("paybox").innerHTML = "";
   } else $("paybox").innerHTML = "";
   for (const el of document.querySelectorAll("#board .card")) fitCard(el);   // ปรับขนาดทันที ไม่ให้กระพริบ
   for (const el of document.querySelectorAll(".field .card[data-uid] .art img")) el.style.animationDelay = `${-((+el.closest(".card").dataset.uid * 0.37) % 2.2)}s`;   // ไม่ขยับพร้อมกัน
@@ -1142,15 +1222,31 @@ function gameOver() {
   gameOver.scened = false;
   if (role === "host" || role === "guest") return gameOverOnline();
   const m = document.createElement("div"); m.className = "modal";
-  m.innerHTML = `<div class="box panel" style="text-align:center"><h2 class="px-text" style="font-size:30px">${V.winner === "me" ? "🏆 คุณชนะ!" : "💀 คุณแพ้"}</h2><p>จบที่เทิร์น ${V.turn}</p>
-    <div class="btns"><button class="main" id="again">${role === "bot" ? "เล่นอีกครั้ง" : "กลับหน้าแรก"}</button><button id="stay">ดูกระดาน</button></div></div>`;
-  m.querySelector("#again").onclick = () => { if (role === "bot") { m.remove(); $("title").style.display = ""; } else location.href = location.pathname; };
-  m.querySelector("#stay").onclick = () => m.remove();
+  m.innerHTML = `<div class="endscreen panel ${V.winner === "me" ? "win" : "lose"}">${endHead()}
+    <div class="btns"><button class="main" id="again">${role === "bot" ? "เล่นอีกครั้ง" : "กลับหน้าแรก"}</button>${role === "bot" ? `<button id="tomenu">เมนูหลัก</button>` : ""}<button id="stay">ดูกระดาน</button></div></div>`;
+  m.querySelector("#again").onclick = () => { if (role === "bot") { m.remove(); $("go").click(); } else location.href = location.pathname; };
+  const tm = m.querySelector("#tomenu"); if (tm) tm.onclick = () => { m.remove(); $("title").style.display = ""; };
+  m.querySelector("#stay").onclick = () => { m.style.display = "none"; showBackBtn(m); };
   document.body.appendChild(m);
+}
+// หัวหน้าจอจบเกม: ป้ายชนะ/แพ้ + พระเอกสองฝั่ง + สถิติ
+function endHead() {
+  const win = V.winner === "me", img = (h) => { const r = ROW[h]; return r && r.art ? `img/${r.art}.png` : ""; }, st = STATS || {};
+  return `<div class="ribbon">${win ? "ชนะ!" : "แพ้"}</div>
+    <div class="heroes"><div class="${win ? "w" : "l"}"><img src="${img(V.me.hero)}" alt=""><b>${esc(V.me.name)}</b></div>
+      <div class="${win ? "l" : "w"}"><img src="${img(V.opp.hero)}" alt=""><b>${esc(V.opp.name)}</b></div></div>
+    <div class="stats"><div><b>${V.turn}</b><span>เทิร์น</span></div><div><b>${st.summon || 0}</b><span>มอนที่อัญเชิญ</span></div><div><b>${st.spell || 0}</b><span>เวทที่ใช้</span></div>
+      <div><b>${st.kill || 0}</b><span>มอนศัตรูที่ล้ม</span></div><div><b>${st.dealt || 0}</b><span>ความเสียหายที่ทำ</span></div><div><b>${st.taken || 0}</b><span>ความเสียหายที่รับ</span></div></div>`;
+}
+// ดูกระดานหลังจบเกม: ปุ่มกลับไปหน้าสรุป
+function showBackBtn(m) {
+  const b = document.createElement("button"); b.className = "main"; b.textContent = "กลับหน้าสรุป";
+  b.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:21";
+  b.onclick = () => { b.remove(); m.style.display = ""; }; document.body.appendChild(b);
 }
 function gameOverOnline() {
   const m = document.createElement("div"); m.className = "modal";
-  m.innerHTML = `<div class="box panel" style="text-align:center"><h2 class="px-text" style="font-size:30px">${V.winner === "me" ? "🏆 คุณชนะ!" : "💀 คุณแพ้"}</h2><p>จบที่เทิร์น ${V.turn}</p>
+  m.innerHTML = `<div class="endscreen panel ${V.winner === "me" ? "win" : "lose"}">${endHead()}
     <label style="display:flex;gap:8px;align-items:center;justify-content:center">เดคตาต่อไป <select id="rmdeck">${deckOptions(false)}</select></label>
     <div class="muted" id="rmstatus"></div>
     <div class="btns"><button class="main" id="rmgo">พร้อมเล่นอีกตา</button><button id="stay">ดูกระดาน</button><button id="leave">ออกจากห้อง</button></div></div>`;
@@ -1162,7 +1258,7 @@ function gameOverOnline() {
     if (role === "guest") conn.send({ type: "rematch", deck: spec }); else conn.send({ type: "rematch" });
     rematchStatus(); tryRematch();
   };
-  m.querySelector("#stay").onclick = () => { m.style.display = "none"; setTimeout(() => (m.style.display = ""), 8000); };
+  m.querySelector("#stay").onclick = () => { m.style.display = "none"; showBackBtn(m); };
   m.querySelector("#leave").onclick = () => { forgetRoom(); location.href = location.pathname; };
   document.body.appendChild(m); rematchStatus();
 }
@@ -1702,6 +1798,11 @@ if (location.hash === "#dragtest") {                                            
     }, 600);
   }, 2500);
 }
+if (location.hash === "#endtest") {                                                    // ทดสอบ: หน้าจบเกม
+  $("go").click(); S.act(0, { t: "mull", idx: [] });
+  setTimeout(() => { STATS && Object.assign(STATS, { summon: 4, spell: 2, kill: 3, dealt: 5, taken: 2 }); S.G.P[1].hp = 0; S.G.winner = S.G.P[0]; S.phase = "over"; S.push(); }, 2500);
+}
+if (location.hash === "#mulltest") { $("go").click(); setTimeout(() => document.querySelector("#mullscreen .card").click(), 1500); }
 if (location.hash === "#paytest") {                                                   // ทดสอบ: โหมดจ่าย gem (ปุ่มอัญเชิญต้องไม่ถูกการ์ดบัง)
   $("go").click(); S.act(0, { t: "mull", idx: [] });
   setTimeout(() => { const [A] = S.G.P; S.G.cur = 0; S.G.turn = 3; S.botDelay = 1e9; A.field.length = 0; A.hand = ["FIS-ANC-05", "FIS-GEN-01", "FIS-ANC-02", "FIS-ANC-12", "FIS-ANC-13", "NEU-SPL-16"].map((id) => CARD[id]); S.push();
