@@ -908,7 +908,7 @@ function gameOverOnline() {
     rematchStatus(); tryRematch();
   };
   m.querySelector("#stay").onclick = () => { m.style.display = "none"; setTimeout(() => (m.style.display = ""), 8000); };
-  m.querySelector("#leave").onclick = () => (location.href = location.pathname);
+  m.querySelector("#leave").onclick = () => { forgetRoom(); location.href = location.pathname; };
   document.body.appendChild(m); rematchStatus();
 }
 function notice(title, body) {
@@ -923,8 +923,9 @@ function newSession(seats, names, decks, opts = {}) {
   overShown = false; V = null; queue.length = 0; $("log").innerHTML = ""; $("title").style.display = "none";
   S = new Session({ cards: ALL, decks, names, seats, seed: Date.now() & 0x7fffffff,
     onView: (i, v) => { if (i === 0) setView(v); else if (conn && conn.open) conn.send({ type: "view", v }); },
-    onLog: (s) => { log(s); if (conn && conn.open) conn.send({ type: "log", s }); },
-    ask: (i, p) => (i === 0 ? askModal(p) : new Promise((res) => { pendingAsk = res; conn.send({ type: "ask", p }); })),
+    onLog: (s) => { log(s); NET.logs.push(s); if (NET.logs.length > 400) NET.logs.shift(); if (conn && conn.open) conn.send({ type: "log", s }); },
+    // ถามเพื่อน (เวทสวน): เก็บคำถามไว้ ส่งซ้ำได้ถ้าเพื่อนหลุดแล้วกลับมา
+    ask: (i, p) => (i === 0 ? askModal(p) : new Promise((res) => { pendingAsk = res; NET.askP = p; if (conn && conn.open) conn.send({ type: "ask", p }); })),
     ...opts });
   S.start();
 }
@@ -980,6 +981,7 @@ function checkRemoteDeck(d) {
 // เล่นอีกตาในห้องเดิม: ทั้งสองฝ่ายกด "พร้อม" แล้วเจ้าของห้องเริ่มเกมใหม่
 const rematch = { me: null, guest: null };
 function resetForNewGame() {
+  NET.logs = []; NET.askP = null;
   overShown = false; V = null; queue.length = 0; mode = "idle"; sel = null; fodder = new Set(); $("log").innerHTML = "";
   for (const m of document.querySelectorAll(".modal")) m.remove();
   rematch.me = rematch.guest = null;
@@ -995,6 +997,32 @@ function tryRematch() {
   newSession(["local", "remote"], [myName(), guestName], decks);
 }
 
+// ---------- ต่อห้องใหม่เมื่อหลุด
+// เพื่อนมี token ประจำตัว (เก็บใน sessionStorage ของแท็บ) — เจ้าของห้องรับคนเดิมกลับเข้าเกมเดิมได้
+// ตรวจการเชื่อมต่อด้วย ping ทุก 4 วิ ถ้าเงียบเกิน 12 วิ ถือว่าหลุด (PeerJS บางครั้งไม่แจ้ง close)
+const NET = { token: null, code: null, lastSeen: 0, hb: 0, logs: [], askP: null, retry: 0, answer: null, askOpen: false };
+const sstore = { get: (k) => { try { return sessionStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { sessionStorage.setItem(k, v); } catch {} }, del: (k) => { try { sessionStorage.removeItem(k); } catch {} } };
+const forgetRoom = () => sstore.del("room");
+function netWait(text) {
+  let m = document.getElementById("netwait");
+  if (!m) {
+    m = document.createElement("div"); m.id = "netwait"; m.className = "modal";
+    m.innerHTML = `<div class="box panel" style="text-align:center"><h2 class="px-text">การเชื่อมต่อหลุด</h2><p id="netwaittext"></p><div class="btns"><button id="netleave">ออกจากห้อง</button></div></div>`;
+    m.querySelector("#netleave").onclick = () => { forgetRoom(); location.href = location.pathname; };
+    document.body.appendChild(m);
+  }
+  m.querySelector("#netwaittext").textContent = text;
+}
+const netWaitOff = () => { const m = document.getElementById("netwait"); if (m) m.remove(); };
+function heartbeat(c) {
+  clearInterval(NET.hb); NET.lastSeen = Date.now();
+  NET.hb = setInterval(() => {
+    if (conn !== c) return clearInterval(NET.hb);
+    if (c.open) try { c.send({ type: "ping" }); } catch {}
+    if (Date.now() - NET.lastSeen > 12000) { clearInterval(NET.hb); try { c.close(); } catch {} if (conn === c) { conn = null; role === "host" ? hostLost() : guestLost(); } }
+  }, 4000);
+}
+
 async function hostRoom() {
   if (typeof deckSpec($("mydeck").value) === "string") { peer = null; return netmsg(esc(deckSpec($("mydeck").value))); }
   role = "host"; remember();
@@ -1007,57 +1035,119 @@ async function hostRoom() {
     if (location.hash === "#nethost") parent.postMessage({ code }, "*");
     netmsg(`รหัสห้อง <span class="code">${code}</span><br>ส่งรหัสนี้ หรือลิงก์ <a href="${esc(link)}" style="color:var(--hi)">${esc(link)}</a> ให้เพื่อน · รอเพื่อนเข้าห้อง…`);
   });
-  peer.on("error", (e) => { if (e.type === "unavailable-id") { peer.destroy(); hostRoom(); } else netmsg(`เชื่อมต่อไม่ได้: ${esc(e.type)}`); });
+  peer.on("disconnected", () => { try { peer.reconnect(); } catch {} });   // เน็ตเจ้าของห้องหลุด: จองรหัสห้องเดิมกลับคืน
+  peer.on("error", (e) => { if (e.type === "unavailable-id" && !S) { peer.destroy(); hostRoom(); } else if (!S) netmsg(`เชื่อมต่อไม่ได้: ${esc(e.type)}`); });
   peer.on("connection", (c) => {
-    if (conn) { c.on("open", () => { c.send({ type: "full" }); setTimeout(() => c.close(), 500); }); return; }
-    conn = c;
-    c.on("data", (d) => {
-      if (!d || typeof d !== "object") return;
-      if (d.type === "hello" && !S) {
-        const deck = checkRemoteDeck(d.deck);
-        if (typeof deck === "string") { c.send({ type: "reject", s: deck }); setTimeout(() => c.close(), 500); conn = null; return; }
-        guestName = String(d.name || "ผู้เล่น 2").slice(0, 16); if (guestName === myName()) guestName += " (2)";
-        newSession(["local", "remote"], [myName(), guestName], [deckSpec($("mydeck").value), deck]);
-      } else if (d.type === "rematch" && S && S.phase === "over") {
-        const deck = checkRemoteDeck(d.deck);
-        if (typeof deck === "string") return c.send({ type: "err", s: deck });
-        rematch.guest = deck; rematchStatus(); tryRematch();
-      } else if (d.type === "act" && S) S.act(1, d.a).then((err) => err && c.send({ type: "err", s: err }));
-      else if (d.type === "answer" && pendingAsk) { const r = pendingAsk; pendingAsk = null; r(d.k); }
-    });
-    c.on("close", () => notice("เพื่อนออกจากห้อง", S && S.phase === "over" ? "เพื่อนออกจากห้องแล้ว" : "การเชื่อมต่อหลุด เกมนี้จบแล้ว"));
+    c.on("data", (d) => hostData(c, d));
+    c.on("close", () => { if (conn === c) { conn = null; hostLost(); } });
   });
 }
+function hostData(c, d) {
+  if (!d || typeof d !== "object") return;
+  if (c === conn) NET.lastSeen = Date.now();
+  if (d.type === "ping") return c.open && c.send({ type: "pong" });
+  if (d.type === "pong") return;
+  if (d.type === "hello") {
+    if (S) {                                                            // เกมกำลังเล่นอยู่: รับเฉพาะเพื่อนคนเดิมกลับเข้ามา
+      if (!d.token || d.token !== NET.token) { c.send({ type: "full" }); setTimeout(() => c.close(), 500); return; }
+      if (conn && conn !== c) try { conn.close(); } catch {}
+      conn = c; heartbeat(c); netWaitOff();
+      c.send({ type: "resume", logs: NET.logs }); S.push(); console.log("RESUME host turn " + S.G.turn);
+      if (NET.askP) c.send({ type: "ask", p: NET.askP });
+      toast(`${guestName} กลับเข้าห้องแล้ว`); return;
+    }
+    if (conn && conn !== c && conn.open) { c.send({ type: "full" }); setTimeout(() => c.close(), 500); return; }
+    const deck = checkRemoteDeck(d.deck);
+    if (typeof deck === "string") { c.send({ type: "reject", s: deck }); setTimeout(() => c.close(), 500); return; }
+    conn = c; NET.token = String(d.token || ""); heartbeat(c);
+    guestName = String(d.name || "ผู้เล่น 2").slice(0, 16); if (guestName === myName()) guestName += " (2)";
+    newSession(["local", "remote"], [myName(), guestName], [deckSpec($("mydeck").value), deck]);
+    return;
+  }
+  if (c !== conn) return;
+  if (d.type === "rematch" && S && S.phase === "over") {
+    const deck = checkRemoteDeck(d.deck);
+    if (typeof deck === "string") return c.send({ type: "err", s: deck });
+    rematch.guest = deck; rematchStatus(); tryRematch();
+  } else if (d.type === "act" && S) S.act(1, d.a).then((err) => err && c.open && c.send({ type: "err", s: err }));
+  else if (d.type === "answer" && pendingAsk) { const r = pendingAsk; pendingAsk = null; NET.askP = null; r(d.k); }
+}
+function hostLost() {
+  if (!S) return;
+  if (S.phase === "over") return notice("เพื่อนออกจากห้อง", "เพื่อนออกจากห้องแล้ว");
+  netWait(`${guestName} หลุดจากห้อง — เกมหยุดไว้ก่อน รอเพื่อนเชื่อมต่อกลับ (เพื่อนเปิดหน้าเว็บเดิมแล้วกด "กลับเข้าห้องเดิม" ได้)`);
+}
+
 async function joinRoom(code) {
   if (typeof deckSpec($("mydeck").value) === "string") { peer = null; return netmsg(esc(deckSpec($("mydeck").value))); }
   role = "guest"; remember();
   code = code.trim().toUpperCase();
   if (!/^[A-Z0-9]{5}$/.test(code)) { peer = null; return netmsg("รหัสห้องต้องมี 5 ตัว"); }
   try { await loadPeer(); } catch (e) { peer = null; return netmsg(esc(e.message)); }
+  const saved = (() => { try { return JSON.parse(sstore.get("room") || "null"); } catch { return null; } })();
+  NET.code = code; NET.token = saved && saved.code === code ? saved.token : Math.random().toString(36).slice(2) + Date.now().toString(36);
+  sstore.set("room", JSON.stringify({ code, token: NET.token }));
   netmsg("กำลังเข้าห้อง…");
   peer = new Peer();
-  peer.on("error", (e) => netmsg(e.type === "peer-unavailable" ? "ไม่พบห้องนี้ (รหัสผิด หรือเจ้าของห้องปิดไปแล้ว)" : `เชื่อมต่อไม่ได้: ${esc(e.type)}`));
-  peer.on("open", () => {
-    conn = peer.connect(PREFIX + code, { reliable: true });
-    conn.on("open", () => { conn.send({ type: "hello", name: myName(), deck: deckSpec($("mydeck").value) }); netmsg("เข้าห้องแล้ว รอเจ้าของห้องเริ่ม…"); });
-    conn.on("data", async (d) => {
-      if (!d || typeof d !== "object") return;
-      if (d.type === "view") { $("title").style.display = "none"; setView(d.v); }
-      else if (d.type === "log") log(String(d.s));
-      else if (d.type === "err") toast(String(d.s));
-      else if (d.type === "full") netmsg("ห้องนี้เต็มแล้ว");
-      else if (d.type === "reject") netmsg("เจ้าของห้องไม่รับเดคนี้: " + esc(String(d.s)));
-      else if (d.type === "newgame") resetForNewGame();
-      else if (d.type === "rematch") { rematch.guest = true; rematchStatus(); }
-      else if (d.type === "ask") { const k = await askModal(d.p); conn.send({ type: "answer", k }); }
-    });
-    conn.on("close", () => notice("เจ้าของห้องออกจากห้อง", V && V.phase === "over" ? "เจ้าของห้องออกจากห้องแล้ว" : "การเชื่อมต่อหลุด เกมนี้จบแล้ว"));
+  peer.on("error", (e) => { if (!conn && !V) netmsg(e.type === "peer-unavailable" ? "ไม่พบห้องนี้ (รหัสผิด หรือเจ้าของห้องปิดไปแล้ว)" : `เชื่อมต่อไม่ได้: ${esc(e.type)}`); });
+  peer.on("disconnected", () => { try { peer.reconnect(); } catch {} });
+  peer.on("open", guestConnect);
+}
+function guestConnect() {
+  const c = peer.connect(PREFIX + NET.code, { reliable: true }); conn = c;
+  c.on("open", () => {
+    NET.retry = 0; heartbeat(c);
+    c.send({ type: "hello", token: NET.token, name: myName(), deck: deckSpec($("mydeck").value) });
+    if (NET.answer != null) { c.send({ type: "answer", k: NET.answer.k }); NET.answer = null; }
+    if (!V) netmsg("เข้าห้องแล้ว รอเจ้าของห้องเริ่ม…");
   });
+  c.on("data", (d) => guestData(c, d));
+  c.on("close", () => { if (conn === c) { conn = null; guestLost(); } });
+}
+async function guestData(c, d) {
+  if (!d || typeof d !== "object") return;
+  NET.lastSeen = Date.now();
+  if (d.type === "ping") return c.open && c.send({ type: "pong" });
+  if (d.type === "pong") return;
+  if (d.type === "view") { $("title").style.display = "none"; setView(d.v); }
+  else if (d.type === "resume") { console.log("RESUME guest"); netWaitOff(); $("log").innerHTML = ""; for (const s of d.logs || []) log(String(s)); toast("กลับเข้าห้องแล้ว"); }
+  else if (d.type === "log") log(String(d.s));
+  else if (d.type === "err") toast(String(d.s));
+  else if (d.type === "full") { netWaitOff(); forgetRoom(); netmsg("ห้องนี้เต็มแล้ว หรือเกมนี้ไม่ใช่ของคุณ"); }
+  else if (d.type === "reject") netmsg("เจ้าของห้องไม่รับเดคนี้: " + esc(String(d.s)));
+  else if (d.type === "newgame") resetForNewGame();
+  else if (d.type === "rematch") { rematch.guest = true; rematchStatus(); }
+  else if (d.type === "ask") {
+    if (NET.askOpen) return;                                          // หน้าต่างเดิมยังเปิดอยู่ (เจ้าของห้องส่งซ้ำหลังต่อใหม่)
+    NET.askOpen = true; const k = await askModal(d.p); NET.askOpen = false;
+    if (conn && conn.open) conn.send({ type: "answer", k }); else NET.answer = { k };   // หลุดระหว่างตอบ: ส่งตอนต่อใหม่
+  }
+}
+function guestLost() {
+  if (!V) { if (!NET.retry) netmsg("การเชื่อมต่อหลุด กำลังลองใหม่…"); }
+  else if (V.phase === "over") return notice("เจ้าของห้องออกจากห้อง", "เจ้าของห้องออกจากห้องแล้ว");
+  NET.retry++;
+  if (NET.retry > 40) { netWaitOff(); forgetRoom(); return notice("ต่อห้องไม่สำเร็จ", "ลองต่อใหม่ 2 นาทีแล้วไม่สำเร็จ เจ้าของห้องอาจปิดหน้าเว็บไปแล้ว"); }
+  if (V) netWait(`กำลังต่อห้องใหม่… (ครั้งที่ ${NET.retry})`);
+  setTimeout(() => {
+    if (conn) return;
+    if (peer.destroyed) { peer = new Peer(); peer.on("open", guestConnect); peer.on("disconnected", () => { try { peer.reconnect(); } catch {} }); }
+    else { if (peer.disconnected) try { peer.reconnect(); } catch {} guestConnect(); }
+    setTimeout(() => { if (conn && !conn.open) { const c = conn; conn = null; try { c.close(); } catch {} guestLost(); } }, 6000);   // ต่อไม่ติดใน 6 วิ → ลองใหม่
+  }, 3000);
 }
 $("host").onclick = () => { if (!peer) { peer = "starting"; hostRoom(); } };
 $("join").onclick = () => { if (!peer) { peer = "starting"; joinRoom($("joincode").value); } };
 const roomParam = new URLSearchParams(location.search).get("room");
 if (roomParam) { $("joincode").value = roomParam.toUpperCase(); netmsg("ใส่ชื่อ เลือกเดค แล้วกด <b>เข้าห้อง</b>"); }
+(() => {                                                              // เคยอยู่ในห้องในแท็บนี้: เสนอกลับเข้าห้องเดิม
+  let saved = null; try { saved = JSON.parse(sstore.get("room") || "null"); } catch {}
+  if (!saved || !saved.code || location.hash) return;
+  $("joincode").value = saved.code;
+  netmsg(`คุณเพิ่งอยู่ในห้อง <span class="code">${esc(saved.code)}</span> <button class="main" id="rejoin">กลับเข้าห้องเดิม</button> <button id="forget">ไม่ต้อง</button>`);
+  $("rejoin").onclick = () => { if (!peer) { peer = "starting"; joinRoom(saved.code); } };
+  $("forget").onclick = () => { forgetRoom(); netmsg(""); };
+})();
 
 // ---------------------------------------------------------------- หน้าจัดเดค
 const B = { name: "", ids: [], idx: null, page: 1 };          // idx = ลำดับในเดคที่บันทึก (null = เดคใหม่ยังไม่บันทึก)
@@ -1331,6 +1421,9 @@ function autoStep() {
     return;
   }
   if (V.phase === "mull" && !V.mullDone) return act({ t: "mull", idx: [0] });
+  // ทดสอบต่อใหม่: ?drop=guest|host → ตัดการเชื่อมต่อ 1 ครั้งกลางเกมแรก
+  const DROP = new URLSearchParams(location.search).get("drop");
+  if (DROP && !window.DROPPED && V.turn >= 2 && (DROP === "guest") === (role === "guest") && conn) { window.DROPPED = true; console.log("DROP " + role); try { conn.close(); } catch {} return; }
   if (!V.myTurn) return;
   const r = Math.random(), hand = V.me.hand.map((h, k) => [h, k]);
   const sum = hand.filter(([h]) => h.costNow != null && !h.err && (h.costNow === 0 || h.auto.length));
