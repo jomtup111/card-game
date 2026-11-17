@@ -2242,7 +2242,9 @@ if (location.hash === "#gangtest") {                                            
 }
 if (location.hash === "#dragtest") {                                                  // ทดสอบลาก: ลากมอนไปตีศัตรู + ลากการ์ดขึ้นสนาม
   $("go").click(); S.act(0, { t: "mull", idx: [] });
-  setTimeout(() => {
+  const ready = () => (S && S.phase === "play" && S.G.cur === 0 && !S.busy && !draining ? setup() : setTimeout(ready, 200));   // รอให้ถึงตาเราจริง (บอทเล่นเทิร์นแรกจบ) ก่อนจัดกระดาน
+  setTimeout(ready, 1500);
+  function setup() {
     const [A, B] = S.G.P; S.G.cur = 0; S.G.turn = 3; S.botDelay = 1e9; A.field.length = B.field.length = 0;
     const u = new Engine.Unit(CARD["HUM-KNI-10"]); u.attacksLeft = 1; A.field.push(u); B.field.push(new Engine.Unit(CARD["HUM-GEN-01"]));
     A.hand = [CARD["NEU-SPL-16"], CARD["HUM-GEN-01"]]; S.push();
@@ -2252,14 +2254,18 @@ if (location.hash === "#dragtest") {                                            
       const mine = document.querySelector("#mfield .card"), foe = document.querySelector("#efield .card");
       const a = mine.getBoundingClientRect(), b = foe.getBoundingClientRect();
       fire("pointerdown", mine, a.x + 20, a.y + 20); fire("pointermove", null, a.x + 40, a.y - 10); fire("pointermove", null, b.x + b.width / 2, b.y + b.height / 2); fire("pointerup", null, b.x + b.width / 2, b.y + b.height / 2);
-      setTimeout(() => {
-        console.log("DRAG attack -> enemy field " + S.G.P[1].field.length);
-        const card = document.querySelector('#mhand .card[data-id="NEU-SPL-16"]'), c = card.getBoundingClientRect();
+      const idle = () => !draining && !$("mullscreen") && !document.querySelector(".banner, .showcard, .modal, .dragghost");
+      const cast = () => {                                              // รอให้อนิเมชันโจมตีจบก่อน แล้วค่อยลากเวท (เดิมลากระหว่างอนิเมชัน → บางครั้งไม่ติด)
+        const card = document.querySelector('#mhand .card[data-id="NEU-SPL-16"]');
+        if (!idle() || !card) return setTimeout(cast, 200);
+        const c = card.getBoundingClientRect();
         fire("pointerdown", card, c.x + 30, c.y + 30); fire("pointermove", null, c.x + 30, c.y - 40); fire("pointermove", null, c.x + 30, c.y - 300); fire("pointerup", null, c.x + 30, c.y - 300);
-        setTimeout(() => console.log("DRAG cast -> spellUsed " + S.G.P[0].spellUsed + " hand " + S.G.P[0].hand.length), 1500);
-      }, 1500);
+        let n = 0; const done = () => (S.G.P[0].spellUsed || ++n > 20) ? console.log("DRAG cast -> spellUsed " + S.G.P[0].spellUsed + " hand " + S.G.P[0].hand.length) : setTimeout(done, 200);
+        setTimeout(done, 300);
+      };
+      setTimeout(() => { console.log("DRAG attack -> enemy field " + S.G.P[1].field.length); cast(); }, 1500);
     }; setTimeout(go, 600);
-  }, 2500);
+  }
 }
 if (location.hash === "#endtest") {                                                    // ทดสอบ: หน้าจบเกม
   $("go").click(); S.act(0, { t: "mull", idx: [] });
