@@ -13,12 +13,13 @@
     constructor(o) {
       Object.assign(this, { botDelay: 600, watch: false, turnSec: 75, deciding: null }, o);
       // บันทึกสำหรับเล่นซ้ำ (รายงานบัค): seed + เดค + ทุกคำสั่งของผู้เล่นคน + คำตอบเวทสวน → เกมเดิมเป๊ะ
-      this.rec = { seed: o.seed, decks: o.decks, seats: o.seats, names: o.names, levels: [], acts: [], answers: [] };
+      // rules: 2 = กติกา 2026-11-18 (HP 7 · ตัวที่เพิ่งเข้าสนามตีหน้าไม่ได้ · ยิงเป้าซ่อนตัวไม่ได้) · ไม่มี = กติกาเดิม (รหัสเล่นซ้ำเก่า)
+      this.rec = { rules: 2, seed: o.seed, decks: o.decks, seats: o.seats, names: o.names, levels: [], acts: [], answers: [] };
       // เดค: ชื่อสาย (จัดอัตโนมัติ) | { arch } | { name, ids: [รหัสการ์ด] } (จัดเอง ต้องผ่าน validateDeck มาแล้ว)
       const byId = new Map(o.cards.map((c) => [c.id, c]));
       const mk = (d) => (d && d.ids ? d.ids.map((id) => byId.get(id)) : E.buildDeck(o.cards, typeof d === "string" ? d : d.arch));
       this.deckNames = o.decks.map((d) => (typeof d === "string" ? d : d.arch || d.name || "เดคจัดเอง"));
-      this.G = new E.Game(mk(o.decks[0]), mk(o.decks[1]), o.seed, (s) => this.onLog(s));
+      this.G = new E.Game(mk(o.decks[0]), mk(o.decks[1]), o.seed, (s) => this.onLog(s), o.rules === 1 ? { hp: 5, rush: false, shootHide: false } : {});
       this.G.P.forEach((p, i) => (p.name = o.names[i]));
       // พระเอกของแต่ละฝั่ง (รูปกลางจอ): หัวหน้าที่ cost สูงสุดในเดค ไม่มีก็พลทหารของเผ่าที่มีมากสุด
       const all = o.cards;
@@ -58,19 +59,20 @@
     view(i) {
       const G = this.G, p = G.P[i], e = G.other(p);
       const my = this.phase === "play" && G.P[G.cur] === p && !this.busy && !G.winner;
-      const status = (x) => {
+      const status = (x, owner) => {
         const s = [];
+        if (G.opt.rush && x.born === G.turn && G.P[G.cur] === owner && !x.noface) s.push("เพิ่งลง: ตีหน้าไม่ได้");
         if (x.frozen) s.push("❄ แช่แข็ง"); if (x.hatch) s.push(`🥚 ${x.hatch[0]}`); if (x.armor) s.push(`เกราะ ${x.armor}`);
         if (x.has("โล่แสง")) s.push("โล่แสง"); if (x.stolenFrom) s.push("ยึดมา"); if (x.attached.length) s.push(`อัปเกรด ×${x.attached.length}`);
         return s;
       };
       const unit = (owner, x, mine) => {
         const v = { uid: x.uid, id: x.card ? x.card.id : null, tok: x.card ? null : { name: x.name, kinds: [...x.kinds], power: x.power },
-          power: mine && my ? G.eff(owner, x, true) : G.eff(owner, x), status: status(x), atkErr: "ยังไม่ใช่ตาคุณ", targets: [], pred: {},
+          power: mine && my ? G.eff(owner, x, true) : G.eff(owner, x), status: status(x, owner), atkErr: "ยังไม่ใช่ตาคุณ", targets: [], pred: {},
           kws: [...new Set([...Object.keys(x.kw), ...Object.keys(x.akw)])].filter((k) => x.has(k) && !["spellproof", "revealed"].includes(k)), armor: G.arm(x) };
         if (mine && my) {
           const ts = G.canAttack(p, x) ? [] : G.targets(p, x);
-          v.atkErr = G.canAttack(p, x) || (ts.length ? null : "ไม่มีเป้าหมายที่ตีได้");
+          v.atkErr = G.canAttack(p, x) || (ts.length ? null : G.opt.rush && x.born === G.turn && !e.field.length ? "เพิ่งลงสนาม: ตีผู้เล่นได้ตั้งแต่เทิร์นหน้า" : "ไม่มีเป้าหมายที่ตีได้");
           for (const t of ts) {
             if (t === "face") { v.targets.push("face"); continue; }
             v.targets.push(t.uid);
