@@ -92,6 +92,15 @@
   .face.target { border-color: var(--bad); cursor: crosshair; background: #ff607033; animation: aim .8s ease-in-out infinite; }
   .pile { display: inline-flex; align-items: center; gap: 4px; color: var(--dim); font-size: 13px; cursor: help; }
   .pile img { width: 18px; height: 21px; }
+  .pile[id$="grave"] { cursor: pointer; }
+  .pile .wakeb { margin-left: 3px; color: #ffd75a; animation: wakepulse 1.2s ease-in-out infinite; }
+  @keyframes wakepulse { 50% { opacity: .45; } }
+  .gravelist { max-height: 60vh; overflow-y: auto; }
+  .millrow { display: flex; gap: 8px; }
+  .gslot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .wtag { font-size: 12px; padding: 1px 6px; border-radius: 4px; }
+  .wtag.on { background: #3a2a00; color: #ffd75a; }
+  .wtag.off { background: #222; color: var(--dim); }
   .grow { flex: 1; }
   #msg { min-height: 24px; color: var(--hi); text-align: center; font-weight: 500; }
   #msg.err { color: #ff9aa6; }
@@ -763,7 +772,7 @@ const KW = ["พรีกาย","ซ่อนตัว","บิน","บดข�
   "สังเวย","ฟื้นคืน","ล่อลวง","เนรเทศ","ขบวน","คอมโบ","ร่ายเวท","คู่หู","มือเต็ม","เครื่องเซ่น","ล่ารุม","กินเหยื่อ","คลั่งเลือด",
   "ฟอสซิลมีชีวิต","หลับใหล","ปลุก:","อัปเกรด","ชิ้นส่วนไททัน","ฟัก"];
 const TOKRACE = { "นรก": "hell", "มนุษย์": "human", "เครื่องจักร": "machine", "ภูต": "spirit", "สัตว์": "beast", "ปลา": "fish", "มังกร": "dragon", "ไดโนเสาร์": "dino" };
-const KWDESC = {"พรีกาย": "รับการโจมตีแทนมอนสเตอร์ฝั่งเรา", "ซ่อนตัว": "ศัตรูเลือกเป็นเป้าโจมตีไม่ได้ ถ้าฝั่งเรายังมีมอนสเตอร์ตัวที่ไม่ซ่อนตัว · ถ้ามีแต่ตัวซ่อนตัว (2 ตัวขึ้นไป) ศัตรูตีผู้เล่นได้แทน (2026-11-18) · ไข่ที่ฟักแล้วไม่ซ่อนตัว", "บิน": "ถ้าเป็นฝ่ายโจมตีแล้วแพ้ ไม่ตาย", "บดขยี้": "ทำลายมอนสเตอร์ตัวสุดท้ายของศัตรูได้ ตีผู้เล่นต่อได้ทันที 1 ครั้ง", "พิษ": "มอนสเตอร์ที่สู้กับตัวนี้ตายเสมอ", "เกราะ N": "เมื่อถูกโจมตี power +N (ทำงานก่อนเทียบ power)", "โล่แสง": "ครั้งแรกที่จะตาย ให้รอดแทน แล้วโล่แตก", "ป้อม": "โจมตีไม่ได้ (ยังรับการโจมตีได้ และกันการตีผู้เล่น)", "ยิง X": "ต้นเทิร์นของเรา ทำลายมอนสเตอร์ศัตรู 1 ตัวที่ power ≤ X · ถ้าสนามศัตรูว่าง มอนสเตอร์ที่มียิงรวมกันยิงผู้เล่น 1 HP (ครั้งเดียวต่อเทิร์น ไม่ใช่การโจมตี จึงยกเลิกด้วยเวทสวน/พรีกายไม่ได้)  · เลือกเป้าที่ ซ่อนตัว ไม่ได้ ถ้าศัตรูมีตัวอื่น (2026-11-18)", "เติบโต": "ต้นเทิร์นของเรา power +1 ถาวร", "สังเวย N": "ต้องทำลายมอนสเตอร์ฝั่งเรา N ตัวตอนอัญเชิญ", "ลงสนาม:": "ทำงานเมื่ออัญเชิญสำเร็จ (เวทสวนยกเลิกได้)", "เมื่อตาย:": "ทำงานเมื่อตัวนี้ตาย", "เมื่อถูกโจมตี:": "ทำงานก่อนเทียบ power", "ทิ้ง:": "ทำงานเมื่อการ์ดนี้ถูกทิ้งจากมือ ไม่ว่าเหตุใด รวมถึงตอนจ่าย gem", "เนรเทศ": "นำการ์ดออกจากเกม", "ส่งไปใต้เดค": "ย้ายไปใต้สุดของเดคเจ้าของ", "ล่อลวง X": "ยึดมอนสเตอร์ศัตรูที่ power ≤ X มาจนจบเทิร์น สั่งโจมตีได้ ต้องมีช่องว่าง", "ผสานธาตุ": "จำนวนธาตุที่ไม่ซ้ำกัน (0–4) ในมอนสเตอร์ทุกตัวที่มีธาตุบนสนามฝั่งเรา", "ขบวน N": "ฝั่งเรามีอัศวิน ≥ N ตัว (นับตัวเอง)", "คอมโบ N": "การ์ดนี้เป็นใบที่ N ขึ้นไปที่เล่นในเทิร์นนี้ (นับทั้งอัญเชิญและใช้เวท)", "ร่ายเวท": "ทำงานทุกครั้งที่เราใช้เวท", "คู่หู": "ฝั่งเรามีมอนสเตอร์เผ่าสัตว์ ไดโนเสาร์ หรือมังกร", "ฟื้นคืน": "สกิลที่สั่งใช้ได้ตอนการ์ดอยู่ในสุสาน", "ศรัทธา": "จำนวนการ์ดสวรรค์บนสนามฝั่งเรา", "มือเต็ม N": "ในมือเรามีการ์ด ≥ N ใบ", "เครื่องเซ่น": "ได้โบนัสเมื่อจ่าย gem เกิน cost", "ล่ารุม": "power +2 ถ้าเทิร์นนี้มีหมาป่าตัวอื่นโจมตีไปก่อน", "กินเหยื่อ": "ทำลายมอนสเตอร์ได้ → power +1 ถาวร", "ฟัก N → X": "ผ่านไป N เทิร์นของเรา กลายเป็น X ในช่องเดิม", "ชิ้นส่วนไททัน": "ชิ้นส่วน 5 ชนิด ตอนลงสนามรวมร่างได้ทันที ถ้าชิ้นส่วนบนสนาม + ในมือรวมกันครบ 3 ชนิดขึ้นไป (power 7/9/11)", "อัปเกรด": "วางซ้อนบนเครื่องจักรแทนการลงช่องใหม่ power รวมกัน ได้สกิลด้วย", "หลับใหล / ปลุก": "อัญเชิญจากมือ/เดคไม่ได้ (รวมถึงเอฟเฟกต์อัญเชิญฟรี) ต้องอยู่ในสุสาน แล้วปลุกตอนต้นเทิร์นเมื่อเงื่อนไขเป็นจริง การปลุกทุกครั้ง (รวมถึงด้วยเวท) ต้องทิ้งการ์ดจากมือจ่าย gem 3 (เดิม 4 · ปรับ 2026-11-17)", "คลั่งเลือด": "power +1 ต่อมอนสเตอร์ที่ตายในเทิร์นนี้ (นับทั้งสองฝั่ง)", "ฟอสซิลมีชีวิต": "ครั้งแรกที่ตาย กลับขึ้นมือแทนลงสุสาน"};
+const KWDESC = {"พรีกาย": "รับการโจมตีแทนมอนสเตอร์ฝั่งเรา", "ซ่อนตัว": "ศัตรูเลือกเป็นเป้าโจมตีไม่ได้ ถ้าฝั่งเรายังมีมอนสเตอร์ตัวที่ไม่ซ่อนตัว · ถ้ามีแต่ตัวซ่อนตัว (2 ตัวขึ้นไป) ศัตรูตีผู้เล่นได้แทน (2026-11-18) · ไข่ที่ฟักแล้วไม่ซ่อนตัว", "บิน": "ถ้าเป็นฝ่ายโจมตีแล้วแพ้ ไม่ตาย", "บดขยี้": "ทำลายมอนสเตอร์ตัวสุดท้ายของศัตรูได้ ตีผู้เล่นต่อได้ทันที 1 ครั้ง", "พิษ": "มอนสเตอร์ที่สู้กับตัวนี้ตายเสมอ", "เกราะ N": "เมื่อถูกโจมตี power +N (ทำงานก่อนเทียบ power)", "โล่แสง": "ครั้งแรกที่จะตาย ให้รอดแทน แล้วโล่แตก", "ป้อม": "โจมตีไม่ได้ (ยังรับการโจมตีได้ และกันการตีผู้เล่น)", "ยิง X": "ต้นเทิร์นของเรา ทำลายมอนสเตอร์ศัตรู 1 ตัวที่ power ≤ X · ถ้าสนามศัตรูว่าง มอนสเตอร์ที่มียิงรวมกันยิงผู้เล่น 1 HP (ครั้งเดียวต่อเทิร์น ไม่ใช่การโจมตี จึงยกเลิกด้วยเวทสวน/พรีกายไม่ได้)  · เลือกเป้าที่ ซ่อนตัว ไม่ได้ ถ้าศัตรูมีตัวอื่น (2026-11-18)", "เติบโต": "ต้นเทิร์นของเรา power +1 ถาวร", "สังเวย N": "ต้องทำลายมอนสเตอร์ฝั่งเรา N ตัวตอนอัญเชิญ", "ลงสนาม:": "ทำงานเมื่ออัญเชิญสำเร็จ (เวทสวนยกเลิกได้)", "เมื่อตาย:": "ทำงานเมื่อตัวนี้ตาย", "เมื่อถูกโจมตี:": "ทำงานก่อนเทียบ power", "ทิ้ง:": "ทำงานเมื่อการ์ดนี้ถูกทิ้งจากมือ ไม่ว่าเหตุใด รวมถึงตอนจ่าย gem", "เนรเทศ": "นำการ์ดออกจากเกม", "ส่งไปใต้เดค": "ย้ายไปใต้สุดของเดคเจ้าของ", "ล่อลวง X": "ยึดมอนสเตอร์ศัตรูที่ power ≤ X มาจนจบเทิร์น สั่งโจมตีได้ ต้องมีช่องว่าง", "ผสานธาตุ": "จำนวนธาตุที่ไม่ซ้ำกัน (0–4) ในมอนสเตอร์ทุกตัวที่มีธาตุบนสนามฝั่งเรา", "ขบวน N": "ฝั่งเรามีอัศวิน ≥ N ตัว (นับตัวเอง)", "คอมโบ N": "การ์ดนี้เป็นใบที่ N ขึ้นไปที่เล่นในเทิร์นนี้ (นับทั้งอัญเชิญและใช้เวท)", "ร่ายเวท": "ทำงานทุกครั้งที่เราใช้เวท", "คู่หู": "ฝั่งเรามีมอนสเตอร์เผ่าสัตว์ ไดโนเสาร์ หรือมังกร", "ฟื้นคืน": "สกิลที่สั่งใช้ได้ตอนการ์ดอยู่ในสุสาน", "ศรัทธา": "จำนวนการ์ดสวรรค์บนสนามฝั่งเรา", "มือเต็ม N": "ในมือเรามีการ์ด ≥ N ใบ", "เครื่องเซ่น": "ได้โบนัสเมื่อจ่าย gem เกิน cost", "ล่ารุม": "power +2 ถ้าเทิร์นนี้มีหมาป่าตัวอื่นโจมตีไปก่อน", "กินเหยื่อ": "ทำลายมอนสเตอร์ได้ → power +1 ถาวร", "ฟัก N → X": "ผ่านไป N เทิร์นของเรา กลายเป็น X ในช่องเดิม", "ชิ้นส่วนไททัน": "ชิ้นส่วน 5 ชนิด ตอนลงสนามรวมร่างได้ทันที ถ้าชิ้นส่วนบนสนาม + ในมือรวมกันครบ 3 ชนิดขึ้นไป (power 7/9/11)", "อัปเกรด": "วางซ้อนบนเครื่องจักรแทนการลงช่องใหม่ power รวมกัน ได้สกิลด้วย", "หลับใหล / ปลุก": "อัญเชิญจากมือ/เดคไม่ได้ (รวมถึงเอฟเฟกต์อัญเชิญฟรี) ต้องอยู่ในสุสาน แล้วปลุกตอนต้นเทิร์นเมื่อเงื่อนไขเป็นจริง การปลุกทุกครั้ง (รวมถึงด้วยเวท) ต้องทิ้งการ์ดจากมือจ่าย gem 3 (เดิม 4 · ปรับ 2026-11-17) · ผู้เล่นเลือกเอง (2026-11-18): ต้นเทิร์นถ้ามีมังกรพร้อมตื่น (เงื่อนไขผ่าน + จ่าย gem ไหว + สนามมีที่) เกมถามทีละตัวว่าจะปลุกตัวไหน กด \"ไม่ปลุก\" ได้ · หมดเวลาตอบ = ไม่ปลุก · บอทปลุกทุกตัวอัตโนมัติเหมือนเดิม · แตะกองสุสานเพื่อดูการ์ดในสุสานทั้งสองฝั่ง (มังกรหลับใหลบอกว่าพร้อมตื่นหรือยัง)", "คลั่งเลือด": "power +1 ต่อมอนสเตอร์ที่ตายในเทิร์นนี้ (นับทั้งสองฝั่ง)", "ฟอสซิลมีชีวิต": "ครั้งแรกที่ตาย กลับขึ้นมือแทนลงสุสาน"};
 // คีย์เวิร์ดในอภิธาน → regex หาในข้อความสกิล (N / X = ตัวเลข)
 const KWPAT = Object.keys(KWDESC).map((k) => {
   const alts = k.split(" / ").map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ → X$/, "").replace(/ [NX]\b/g, " \\d+"));
@@ -1204,6 +1213,7 @@ function histOf(e, v) {
   const unitById = (uid) => V && [...V.me.field, ...V.opp.field].find((x) => x.uid === uid);
   if (e.t === "summon") pushHist(e.id, mineSeat(e.by, v), "✨", `${nm(e.by)} อัญเชิญ ${ROW[e.id] ? ROW[e.id].name : ""}`);
   else if (e.t === "cast") pushHist(e.id, mineSeat(e.by, v), "🔮", `${nm(e.by)} ร่ายเวท ${ROW[e.id] ? ROW[e.id].name : ""}`);
+  else if (e.t === "mill") for (const id of e.ids || []) pushHist(id, mineSeat(e.by, v), "🪦", `${nm(e.by)} ${e.why} ${ROW[id] ? ROW[id].name : ""}`);
   else if (e.t === "react") pushHist(e.id, mineSeat(e.by, v), "✋", `${nm(e.by)} ใช้เวทสวน ${ROW[e.id] ? ROW[e.id].name : ""}`);
   else if (e.t === "attack" || e.t === "gang") {
     const a = unitById(e.t === "gang" ? e.as[0] : e.a); if (!a) return;
@@ -1279,6 +1289,15 @@ async function playFx(e, v) {
     const mine = mineSeat(e.by, v), from = mine ? document.querySelector(`#mhand .card[data-id="${e.id}"]`) || $("mhand") : $("ehand");
     flyCard(rectOf(from), rectOf($(mine ? "mgrave" : "egrave")), { id: e.id, ms: 420, shrink: true });
     await sleep(60);
+  } else if (e.t === "mill") {                                         // การ์ดจากเดค/มือไปสุสาน (ทิ้งบนเดค · ส่งลงสุสาน): โชว์หน้าการ์ดแล้วบินลงสุสาน
+    const mine = mineSeat(e.by, v), ids = (e.ids || []).filter((id) => ROW[id]); if (!ids.length) return;
+    const ms = (mine ? 1100 : 1500) * SET.speed, d = document.createElement("div"); d.className = "showcard" + (mine ? "" : " opp"); d.style.animationDuration = ms + "ms";
+    d.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:10px"><b class="px-text">${esc((mine ? "เรา" : v.opp.name) + " " + e.why)}</b><div class="millrow"></div></div>`;
+    for (const id of ids) d.querySelector(".millrow").appendChild(cardEl(ROW[id]));
+    document.body.appendChild(d); await sleep(ms * 0.8);
+    const from = rectOf(d.querySelector(".millrow")); d.remove();
+    ids.forEach((id, k) => flyCard(from, rectOf($(mine ? "mgrave" : "egrave")), { id, ms: 420, delay: k * 90, shrink: true }));
+    await sleep(200);
   } else if (e.t === "zap") {                                          // ทำลายด้วยเวท: สายฟ้าฟาด
     const t = unitEl(e.uid); if (!t) return; const [x, y] = center(rectOf(t));
     const b = document.createElement("img"); b.src = "img/ui_bolt.png"; b.className = "pfx"; b.style.width = "56px"; b.style.left = x - 28 + "px"; b.style.top = y - 150 + "px"; fxLayer.appendChild(b);
@@ -1344,7 +1363,9 @@ function render() {
   $("ehand").title = `การ์ดในมือ ${V.opp.name}: ${V.opp.handCount} ใบ`;
   for (const [side, d, g] of [[V.me, "mdeck", "mgrave"], [V.opp, "edeck", "egrave"]]) {
     $(d).innerHTML = `<img src="img/ui_deck.png" alt="">${side.deck}`; $(d).title = "เดค";
-    $(g).innerHTML = `<img src="img/ui_grave.png" alt="">${side.grave.length}`; $(g).title = "สุสาน:\n" + (side.grave.join("\n") || "ว่าง");
+    const rdy = (side.graveWake || []).filter((w) => w === true).length;   // มังกรหลับใหลที่เงื่อนไขปลุกผ่านแล้ว
+    $(g).innerHTML = `<img src="img/ui_grave.png" alt="">${side.grave.length}${rdy ? `<b class="wakeb" title="มังกรพร้อมตื่น">🐉${rdy}</b>` : ""}`; $(g).title = "แตะเพื่อดูสุสาน";
+    $(g).onclick = () => showGrave(side === V.me);
   }
   $("earch").textContent = V.opp.arch;
   $("minfo").textContent = `เทิร์น ${V.turn} · เวทปกติ ${V.me.spellUsed}/${V.me.spellMax}`;
@@ -1681,6 +1702,24 @@ function targetClick(uid) {
   SFX.play("click");
   if (t.p.n === 1) return t.resolve([k]);
   t.picked.has(k) ? t.picked.delete(k) : t.picked.size < t.p.n && t.picked.add(k); render();
+}
+// ดูสุสาน (ของเรา/ศัตรู) · มังกรหลับใหล: บอกว่าเงื่อนไขปลุกผ่านแล้วหรือยัง (ตื่นเองต้นเทิร์นของเจ้าของ ถ้าจ่าย gem ไหวและสนามมีที่)
+function showGrave(mine) {
+  const side = mine ? V.me : V.opp, ids = side.graveIds || [], wk = side.graveWake || [];
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="box panel"><h2 class="px-text">สุสาน${mine ? "เรา" : side.name} (${ids.length})</h2>
+    <p class="muted">${wk.some((w) => w != null) ? "🐉 = มังกรหลับใหล · <b>พร้อมตื่น</b> = เงื่อนไขผ่านแล้ว ต้นเทิร์นเจ้าของเลือกปลุกได้ (จ่าย gem 3 · สนามต้องมีที่)" : "การ์ดล่าสุดอยู่ท้าย"}</p>
+    <div class="cards gravelist"></div><div class="btns"><button class="main" id="gvok">ปิด</button></div></div>`;
+  const box = m.querySelector(".cards");
+  ids.forEach((id, k) => {
+    if (!ROW[id]) return;
+    const w = document.createElement("div"); w.className = "gslot"; w.appendChild(cardEl(ROW[id]));
+    if (wk[k] != null) { const t = document.createElement("div"); t.className = "wtag " + (wk[k] ? "on" : "off"); t.textContent = wk[k] ? "🐉 พร้อมตื่น" : "💤 ยังไม่ครบเงื่อนไข"; w.appendChild(t); }
+    box.appendChild(w);
+  });
+  if (!ids.length) box.innerHTML = `<p class="muted">ว่าง</p>`;
+  const close = () => m.remove(); m.querySelector("#gvok").onclick = close; m.onclick = (ev) => ev.target === m && close();
+  document.body.appendChild(m);
 }
 // เลือกการ์ดในมือที่จะทิ้งเป็นค่าใช้สกิล
 function pickDiscard(ab) {

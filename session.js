@@ -90,14 +90,15 @@
         return { id: c.id, gem: G.gemOf(p, c), costNow: mon ? G.cost(p, c) : null, err, dead: !mon && !c.spell.length && !c.counter,
           auto: mon && my && !err ? (G.autoPay(p, G.cost(p, c), c) || []).map((x) => p.hand.indexOf(x)) : [] };
       });
+      const wakeOf = (q) => q.grave.map((c) => (c.kw["หลับใหล"] && c.awaken ? G.awakenOk(q, c) : null));   // มังกรหลับใหล: เงื่อนไขปลุกผ่านแล้วไหม
       return {
         seat: i, phase: this.phase, mullDone: this.mullDone[i], turn: G.turn, myTurn: my, busy: this.busy,
         paused: this.deciding != null && this.deciding !== G.cur, turnSec: this.turnSec, cur: G.cur,
         whoseTurn: G.P[G.cur].name, winner: G.winner ? (G.winner === p ? "me" : "opp") : null,
-        me: { name: p.name, hero: this.heroes[i], arch: this.deckNames[i], hp: p.hp, deck: p.deck.length, grave: p.grave.map((c) => c.name), hand,
+        me: { name: p.name, hero: this.heroes[i], arch: this.deckNames[i], hp: p.hp, deck: p.deck.length, grave: p.grave.map((c) => c.name), graveIds: p.grave.map((c) => c.id), graveWake: wakeOf(p), hand,
               field: p.field.map((x) => unit(p, x, true)), spellUsed: p.spellUsed, spellMax: G.spellCap(p),
               abilities: my ? G.abilities(p).map(({ key, label, pay, err }) => ({ key, label, pay, err })) : [] },
-        opp: { name: e.name, hero: this.heroes[1 - i], arch: this.deckNames[1 - i], hp: e.hp, deck: e.deck.length, grave: e.grave.map((c) => c.name), handCount: e.hand.length,
+        opp: { name: e.name, hero: this.heroes[1 - i], arch: this.deckNames[1 - i], hp: e.hp, deck: e.deck.length, grave: e.grave.map((c) => c.name), graveIds: e.grave.map((c) => c.id), graveWake: wakeOf(e), handCount: e.hand.length,
                field: e.field.map((x) => unit(e, x, false)) },
       };
     }

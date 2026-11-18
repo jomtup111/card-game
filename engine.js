@@ -689,8 +689,8 @@
           const cs = [...new Set(zs.flatMap((z) => z.filter(ok)))], zOf = (c) => zs.find((z) => z.includes(c));
           if (cards(cs, 1, `เลือก${a[1]} 1 ใบจาก${a[2] === "both" ? "มือหรือเดค" : zs[0] === p.deck ? "เดค" : "มือ"}ลงสุสาน`,
             (l) => { const d = l.filter((c) => p.deck.includes(c)); return [...(d.length ? d : l)].sort((x, y) => !!y.kw["หลับใหล"] - !!x.kw["หลับใหล"]); },
-            () => zs.flat(), (c) => { const z = zOf(c); z.splice(z.lastIndexOf(c), 1); p.grave.push(c); })) return true; }
-        else if (k === "mill") { for (let i = 0; i < a[1]; i++) if (p.deck.length) p.grave.push(p.deck.pop()); }
+            () => zs.flat(), (c) => { const z = zOf(c), fromDeck = z === p.deck; z.splice(z.lastIndexOf(c), 1); p.grave.push(c); this.milled(p, [c], fromDeck ? "ส่งจากเดคลงสุสาน" : "ส่งจากมือลงสุสาน", !fromDeck); })) return true; }
+        else if (k === "mill") { const cs = []; for (let i = 0; i < a[1]; i++) if (p.deck.length) { const c = p.deck.pop(); p.grave.push(c); cs.push(c); } this.milled(p, cs, "ทิ้งจากบนเดคลงสุสาน"); }
         else if (k === "cheat") { const [, word, lim, zone] = a; if (p.field.length >= FIELD) continue; const ok = (c) => c.type === "มอน" && kindMatch(c.kinds, word) && c.cost <= lim && !c.kw["หลับใหล"];
           const zs = zone === "มือ" ? [p.hand, p.deck] : [p.deck], cs = [...new Set(zs.flatMap((z) => z.filter(ok)))], zOf = (c) => zs.find((z) => z.includes(c));
           if (cards(cs, 1, `เลือก${word} 1 ตัว${zone === "มือ" ? "จากมือหรือเดค" : "จากเดค"}อัญเชิญฟรี`, () => { for (const z of zs) { const cand = z.filter(ok); if (cand.length) return [cand.sort((x, y) => y.base - x.base)[0]]; } return []; },
@@ -797,16 +797,31 @@
         const am = tgt.match(/เกราะ (\d+)/); if (am) u.armor = +am[1];
       }
     }
+    // การ์ดไปสุสานโดยไม่ผ่านการทิ้ง (บนเดค / ส่งลงสุสาน): บอกในบันทึก + หน้าจอโชว์การ์ดบินลงสุสาน
+    milled(p, cs, why, fromHand = false) {
+      if (!cs.length) return;
+      this.log(`   🪦 ${p.name} ${why}: ${cs.map((c) => c.name).join(", ")}`);
+      this.emit({ t: "mill", by: this.P.indexOf(p), ids: cs.map((c) => c.id), why, hand: fromHand });
+    }
+    // เงื่อนไขปลุกของการ์ดหลับใหลในสุสานผ่านไหม
+    awakenOk(p, c) {
+      const w = c.awaken || ""; let m;
+      if ((m = w.match(/สุสานเรามีการ์ด ≥ (\d+)/))) return p.grave.length >= +m[1];
+      if ((m = w.match(/HP เราเหลือ ≤ (\d+)/))) return p.hp <= +m[1];
+      if ((m = w.match(/เทิร์นที่ (\d+) ของเรา/))) return p.turns >= +m[1];
+      if ((m = w.match(/มี(?:การ์ด)?(\S+?)(ตัวอื่น)? ≥ (\d+) ใบในสุสาน/))) return this.count(p, m[1], "grave") - (m[2] && kindMatch(c.kinds, m[1]) ? 1 : 0) >= +m[3];
+      if (w.includes("มังกรโบราณตัวอื่น")) return p.field.some((u) => u.kinds.has("มังกรโบราณ"));
+      return false;
+    }
+    // ต้นเทิร์น: มังกรที่ตรงเงื่อนไข + จ่าย gem ไหว + สนามมีที่ → ตื่น · ผู้เล่นคนเลือกเองทีละตัวว่าจะปลุกตัวไหน (ไม่ปลุกก็ได้)
     awakenCheck(p) {
-      for (const c of p.grave.filter((c) => c.kw["หลับใหล"] && c.awaken)) {
-        const w = c.awaken; let ok = false, m;
-        if ((m = w.match(/สุสานเรามีการ์ด ≥ (\d+)/))) ok = p.grave.length >= +m[1];
-        else if ((m = w.match(/HP เราเหลือ ≤ (\d+)/))) ok = p.hp <= +m[1];
-        else if ((m = w.match(/เทิร์นที่ (\d+) ของเรา/))) ok = p.turns >= +m[1];
-        else if ((m = w.match(/มี(?:การ์ด)?(\S+?)(ตัวอื่น)? ≥ (\d+) ใบในสุสาน/))) ok = this.count(p, m[1], "grave") - (m[2] && kindMatch(c.kinds, m[1]) ? 1 : 0) >= +m[3];
-        else if (w.includes("มังกรโบราณตัวอื่น")) ok = p.field.some((u) => u.kinds.has("มังกรโบราณ"));
-        if (ok && p.field.length < FIELD && p.grave.includes(c) && this.payAwaken(p, c)) { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); this.log(`🐉 ${c.name} ตื่นจากสุสาน`); }
-      }
+      const ready = () => p.field.length < FIELD ? p.grave.filter((c) => c.kw["หลับใหล"] && c.awaken && this.awakenOk(p, c) && this.autoPay(p, c.awakenGem, null) != null) : [];
+      const wake = (c) => { if (p.field.length < FIELD && p.grave.includes(c) && this.payAwaken(p, c)) { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); this.log(`🐉 ${c.name} ตื่นจากสุสาน`); } };
+      if (!this.picker || !this.picker(p)) { for (const c of p.grave.filter((c) => c.kw["หลับใหล"] && c.awaken)) if (this.awakenOk(p, c)) { const n0 = p.field.length; wake(c); if (this.opt.awakenOne && p.field.length > n0) return; } return; }
+      const rs = ready(); if (!rs.length) return;
+      this.choose({ kind: "card", chooser: p, cands: rs, n: 1, optional: true, why: `มังกรพร้อมตื่น: เลือกตัวที่จะปลุก (จ่าย gem ${rs[0].awakenGem})`, sub: "แตะมังกรที่จะปลุก แล้วเลือกการ์ดจ่าย gem · หรือกดไม่ปลุก",
+        okLabel: "ปลุก", skipLabel: "ไม่ปลุก", valid: (c) => p.grave.includes(c) && p.field.length < FIELD,
+        auto: (n, l) => l.slice(0, n), after: (cs) => { if (!cs.length) return; wake(cs[0]); if (!this.opt.awakenOne) this.awakenCheck(p); } });   // opt.awakenOne (ทดลอง): ปลุกได้ 1 ตัวต่อเทิร์น
     }
     payAwaken(p, c) {
       const f = this.autoPay(p, c.awakenGem, null); if (f == null) return false;
@@ -1269,10 +1284,11 @@
         if (u.card && u.card.sot.length && p.field.includes(u)) this.run(p, u.card.sot, u.card);
       }
       if (shooters && !e.field.length) this.hurt(e, 1, " (ถูกยิง)");
-      this.awakenCheck(p);
+      if (!this.opt.awakenLate) this.awakenCheck(p);                    // ปลุกก่อนจั่ว (opt.awakenLate ทดลอง = หลังจั่ว: มังกรโบราณ 47.8→90.4%)
       p.draw((this.opt.draw || DRAW) + (p.bonusDraw && p.turns % p.bonusDraw === 0 ? 1 : 0));   // bonusDraw = บอทยาก: จั่วเพิ่ม 1 ใบทุก N เทิร์นของตัวเอง
       if (this.opt.minHand && p.hand.length < this.opt.minHand && !p.lost) p.draw(this.opt.minHand - p.hand.length);   // กติกาทดลอง: เติมมือขั้นต่ำ
       if (p.lost) this.log(`${p.name} เดคหมด`);
+      if (this.opt.awakenLate) this.awakenCheck(p);
       this.checkEnd();
     }
     shootWith(p, u, bonus = 0) {
