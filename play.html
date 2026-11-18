@@ -1623,7 +1623,10 @@ $("logbtn").onclick = (e) => { e.stopPropagation(); $("side").classList.toggle("
 document.addEventListener("click", (e) => { if (!$("side").contains(e.target)) $("side").classList.remove("open"); });
 
 // ฝ่ายรับเลือกตอบโต้: เวทสวน / พรีกายจากมือ → ตำแหน่งตัวเลือก หรือ null
-function askModal(p) {
+// รออนิเมชันของเหตุการณ์ก่อนหน้า (ศัตรูตี / ร่ายเวท) เล่นจบก่อน แล้วค่อยเปิดหน้าต่างเลือก
+const fxIdle = () => new Promise((ok) => { const t = () => (!draining && !queue.length ? ok() : setTimeout(t, 80)); t(); });
+async function askModal(p) { await fxIdle(); return askNow(p); }
+function askNow(p) {
   if (p.kind === "discard") return askDiscard(p);
   if (p.kind === "unit") return askTarget(p);
   if (window.AUTOPLAY) return Promise.resolve(p.opts.length && Math.random() < 0.6 ? 0 : null);
