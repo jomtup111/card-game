@@ -96,7 +96,8 @@
         if ((m = body.match(/^ถ้ามี(.+?)ฝั่งเรา (?!≥)(.+)$/))) { this.spellCond = m[1]; body = m[2]; }
         if ((m = body.match(/^(คอมโบ|ขบวน) (\d+): (.+)$/))) { this.spellPre = [m[1], +m[2]]; body = m[3]; }
         if ((m = body.match(/^ถ้าผสานธาตุ = (\d+) (.+)$/))) { this.spellPre = ["ธาตุ", +m[1]]; body = m[2]; }
-        if (this.type === "เวทสวน" && (m = body.match(/^สังเวย (\d+) ตัว/))) this.sac = +m[1];   // ค่าสังเวยของเวทสวน (จ่ายตอนใช้)
+        if (this.type === "เวทสวน" && (m = body.match(/^สังเวย (\d+) ตัว/))) this.sac = +m[1];
+        if (this.type === "เวทสวน" && (m = body.match(/^ส่ง(.+?) 1 ใบจากมือลงสุสาน/))) this.handCost = m[1];   // ค่าเวทสวน: ส่งการ์ด (ชนิดนี้) จากมือลงสุสาน   // ค่าสังเวยของเวทสวน (จ่ายตอนใช้)
         if (body.includes("ยกเลิกการโจมตี")) { const t = body.match(/ที่เป้าหมายเป็น(\S+)/); this.counter = ["attack", t ? t[1] : null, { t: "cancel", kill: body.includes("ทำลายตัวที่โจมตี") }]; return true; }
         if (body.includes('ยกเลิกสกิล "ลงสนาม"')) { this.counter = ["etb", null]; this.counterEtb = true; return true; }
         if (body.includes("ยกเลิกเวท")) { this.counter = ["spell", null]; if (body.includes('"ลงสนาม"')) this.counterEtb = true; return true; }
@@ -328,11 +329,12 @@
         if ((m = part.match(/^(.+?)( 1 ตัว|ทุกตัว)(?:ฝั่งเรา)? power \+(\d+) (ถาวร|จนจบเทิร์น)$/)) && m[1].length < 25) { out.push(["buff", m[1], +m[3], m[4] === "ถาวร", m[2].includes("ทุก")]); continue; }
         if ((m = part.match(/^ค้น(.+?)(?: cost ([≤≥]) (\d+))? ?จากเดคขึ้นมือ(?: \d+ ใบ)?$/)) || (m = part.match(/^ค้น(.+?)(?: cost ([≤≥]) (\d+))?ขึ้นมือ(?: \d+ ใบ)?$/))) { out.push(["search", m[1], m[2] || null, m[3] ? +m[3] : null]); continue; }
         if ((m = part.match(/^(นำ|อัญเชิญ)(.+?)(?: cost ≤ (\d+))?(?: จาก| 1 (?:ใบ|ตัว)จาก)สุสาน(?:ฟรี|ขึ้นมือ)?(?: (\d+) ตัว)?(?: โดยไม่ต้องตรงเงื่อนไข)?$/)) && !m[2].includes("มังกรโบราณ")) { out.push(["raise", m[2], m[3] ? +m[3] : 99, m[1] === "อัญเชิญ", +(m[4] || 1)]); continue; }
-        if ((m = part.match(/^ส่ง(.+?) 1 ใบจาก(?:มือหรือ)?เดคลงสุสาน$/))) { out.push(["entomb", m[1]]); continue; }
+        if ((m = part.match(/^ส่ง(.+?) 1 ใบจาก(มือหรือ)?เดคลงสุสาน$/))) { out.push(m[2] ? ["entomb", m[1], "both"] : ["entomb", m[1]]); continue; }
         if ((m = part.match(/^ทิ้งการ์ด (\d+) ใบบนสุดของเดคลงสุสาน$/))) { out.push(["mill", +m[1]]); continue; }
         if ((m = part.match(/^อัญเชิญ(.+?)(?: cost ≤ (\d+))?(?: 1 ตัว)? ?จาก(มือ|เดค)(?:หรือเดค)?(?:ได้)?ฟรี(?: 1 ตัว)?.*$/))) { out.push(["cheat", m[1], m[2] ? +m[2] : 99, m[3]]); continue; }
         if ((m = part.match(/^ศัตรูทิ้งการ์ดจากมือ (\d+) ใบ$|^ศัตรูทิ้งการ์ดทั้งมือ$/))) { out.push(["edisc", m[1] ? +m[1] : 99]); continue; }
         if (part.startsWith("รวมชิ้นส่วนไททัน") || part.startsWith("อัญเชิญชิ้นส่วนไททันทุกชนิด")) { out.push(["titan", part.includes("อัญเชิญ")]); continue; }
+        if (/^ไข่ฝั่งเรา 1 ฟองฟักทันที.*$/.test(part)) { out.push(["hatchone"]); continue; }   // 1 ฟอง = เลือกฟองเดียว (เดิมฟักทุกฟอง)
         if (/^ไข่(?:ทุกฟอง)?ฝั่งเรา(?: 1 ฟอง)?ฟักทันที.*$/.test(part)) { out.push(["hatchall"]); continue; }
         if ((m = part.match(/^(?:ปลุก|อัญเชิญ)มังกรโบราณ(ทุกตัว| 1 ตัว)จากสุสาน.*$/))) { out.push(["awakenall", m[1].includes("ทุก") ? 99 : 1]); continue; }
         return [];
@@ -389,7 +391,8 @@
     // opt: กติกาทดลอง (ค่าเริ่มต้น = กติกาปัจจุบัน) { hand0, draw, firstDiscount, loot, catchup }
     constructor(deckA, deckB, seed = Date.now(), log = () => {}, opt = {}) {
       // กติกา 2026-11-18: rush = มอนที่เพิ่งเข้าสนามเทิร์นนี้ตีผู้เล่นไม่ได้ · shootHide = ยิงเลือกเป้าซ่อนตัวไม่ได้ · กติกาเดิม: { hp: 5, rush: false, shootHide: false }
-      this.opt = Object.assign({ gang: 2, rush: true, shootHide: true }, opt);   // ตีรวม (2026-11-17): รุมตีได้ เป้าฆ่ากลับ 1 ตัว · ทดลองปิดด้วย { gang: 0 }
+      // hiddenFace = ศัตรูมีแต่ตัวซ่อนตัว (≥2) → ตีผู้เล่นได้ (2026-11-18 แก้เกมค้าง)
+      this.opt = Object.assign({ gang: 2, rush: true, shootHide: true, hiddenFace: true }, opt);   // ตีรวม (2026-11-17): รุมตีได้ เป้าฆ่ากลับ 1 ตัว · ทดลองปิดด้วย { gang: 0 }
       this.rnd = rngOf(seed); this.log = log;
       UID = 0;                                           // uid นับใหม่ทุกเกม → รหัสเล่นซ้ำ (รายงานบัค) ใช้ได้แม้เป็นเกมที่ 2+ ในหน้าเดียวกัน
       this.P = [new Player("คุณ", deckA, this.rnd), new Player("บอท", deckB, this.rnd)];
@@ -681,8 +684,12 @@
           const one = (c) => { p.grave.splice(p.grave.indexOf(c), 1); if (toField && c.type === "มอน" && p.field.length < FIELD) this.place(p, c); else p.hand.push(c); };
           if (!this.picker || !this.picker(p)) { for (let i = 0; i < n; i++) { const cand = p.grave.filter(ok); if (!cand.length) break; one(cand.sort((x, y) => y.base - x.base)[0]); } }   // บอท: เหมือนเดิม (เลือกใหม่ทีละใบ)
           else if (cards(p.grave.filter(ok), n, `เลือก${word} ${n} ใบจากสุสาน${toField ? "อัญเชิญ" : "ขึ้นมือ"}`, (l) => [...l].sort((x, y) => y.base - x.base), () => p.grave, one)) return true; }
-        else if (k === "entomb") { const z = p.deck.some((c) => kindMatch(c.kinds, a[1])) ? p.deck : p.hand;
-          if (cards([...new Set(z.filter((c) => kindMatch(c.kinds, a[1])))], 1, `เลือก${a[1]} 1 ใบจาก${z === p.deck ? "เดค" : "มือ"}ลงสุสาน`, (l) => [...l].sort((x, y) => !!y.kw["หลับใหล"] - !!x.kw["หลับใหล"]), () => z, (c) => { z.splice(z.indexOf(c), 1); p.grave.push(c); })) return true; }
+        else if (k === "entomb") {                                         // "จากมือหรือเดค" = เลือกได้ทั้งสองที่ · "จากเดค" = เดคก่อน (ไม่มีค่อยมือ)
+          const ok = (c) => kindMatch(c.kinds, a[1]), zs = a[2] === "both" ? [p.deck, p.hand] : [p.deck.some(ok) ? p.deck : p.hand];
+          const cs = [...new Set(zs.flatMap((z) => z.filter(ok)))], zOf = (c) => zs.find((z) => z.includes(c));
+          if (cards(cs, 1, `เลือก${a[1]} 1 ใบจาก${a[2] === "both" ? "มือหรือเดค" : zs[0] === p.deck ? "เดค" : "มือ"}ลงสุสาน`,
+            (l) => { const d = l.filter((c) => p.deck.includes(c)); return [...(d.length ? d : l)].sort((x, y) => !!y.kw["หลับใหล"] - !!x.kw["หลับใหล"]); },
+            () => zs.flat(), (c) => { const z = zOf(c); z.splice(z.lastIndexOf(c), 1); p.grave.push(c); })) return true; }
         else if (k === "mill") { for (let i = 0; i < a[1]; i++) if (p.deck.length) p.grave.push(p.deck.pop()); }
         else if (k === "cheat") { const [, word, lim, zone] = a; if (p.field.length >= FIELD) continue; const ok = (c) => c.type === "มอน" && kindMatch(c.kinds, word) && c.cost <= lim && !c.kw["หลับใหล"];
           const zs = zone === "มือ" ? [p.hand, p.deck] : [p.deck], cs = [...new Set(zs.flatMap((z) => z.filter(ok)))], zOf = (c) => zs.find((z) => z.includes(c));
@@ -693,8 +700,15 @@
           if (ask({ chooser: look ? p : e, victim: e, n: a[1], look, why: look ? `เลือกการ์ดในมือ ${e.name} ${a[1]} ใบให้ทิ้ง` : `ต้องทิ้งการ์ดจากมือ ${a[1]} ใบ`, after: (cs) => this.discardMany(e, cs, "ทิ้ง") })) return true;
         }
         else if (k === "titan") { if (a[1]) { const seen = new Set(p.field.map((u) => u.name)); for (const c of [...p.deck]) if (c.kinds.has("ชิ้นส่วนไททัน") && !seen.has(c.name) && p.field.length < FIELD) { p.deck.splice(p.deck.indexOf(c), 1); p.field.push(new Unit(c)); seen.add(c.name); } } this.titan(p); }
+        else if (k === "hatchone") {
+          if (mine(p.field.filter((u) => u.hatch), 1, "เลือกไข่ 1 ฟองให้ฟักทันที", (u) => { const saved = p.field.filter((x) => x !== u && x.hatch).map((x) => [x, x.hatch[0]]); for (const [x] of saved) x.hatch[0] = 999; u.hatch[0] = 1; this.hatch(p); for (const [x, v] of saved) if (x.hatch) x.hatch[0] = v; },
+            { auto: (need, cs) => [...cs].sort((x, y) => (y.hatch[1] || 0) - (x.hatch[1] || 0)).slice(0, need) })) return true;
+        }
         else if (k === "hatchall") { for (const u of p.field) if (u.hatch) u.hatch[0] = 1; this.hatch(p); }
-        else if (k === "awakenall") { for (const c of p.grave.filter((c) => c.kw["หลับใหล"]).slice(0, a[1])) if (p.field.length < FIELD && this.payAwaken(p, c)) { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); } }
+        else if (k === "awakenall") {                                      // ปลุก N ตัว: เลือกเองว่าตัวไหน (เฉพาะการ์ดหลับใหลในสุสาน)
+          const wake = (c) => { if (p.field.length < FIELD && p.grave.includes(c) && this.payAwaken(p, c)) { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); } };
+          if (cards(p.grave.filter((c) => c.kw["หลับใหล"]), a[1], `เลือกมังกรโบราณ ${a[1]} ตัวจากสุสานที่จะปลุก`, (l) => l, () => p.grave, wake)) return true;
+        }
         else if (k === "own") {
           const [, word, n, fx] = a, all = ["มอนสเตอร์", ""].includes(normKind(word));
           let tg = p.field.filter((u) => all || kindMatch(u.kinds, word));
@@ -775,7 +789,8 @@
       const speed = p.field.some((o) => o.card && (o.card.ab.includes("ฟักเร็วขึ้น") || o.card.ab.includes("นับเวลาฟักเพิ่ม"))) ? 2 : 1;
       for (const u of [...p.field]) {
         if (!u.hatch) continue; u.hatch[0] -= speed; if (u.hatch[0] > 0) continue;
-        const [, pw, tgt] = u.hatch; u.hatch = null; u.noatk = false; if (pw != null) u.power = pw; this.log(`🥚 ${u.name} ฟักแล้ว`); this.emit({ t: "hatch", uid: u.uid });
+        const [, pw, tgt] = u.hatch; u.hatch = null; u.noatk = false; if (pw != null) u.power = pw;
+        if (!this.opt.hatchKeepHidden && !/ซ่อนตัว/.test(tgt || "")) u.kw["ซ่อนตัว"] = false;        // ฟักแล้วไม่ใช่ไข่ = ไม่ซ่อนตัวแล้ว this.log(`🥚 ${u.name} ฟักแล้ว`); this.emit({ t: "hatch", uid: u.uid });
         const m = tgt.match(/อัญเชิญ(\S+) cost ≤ (\d+)/);
         if (tgt.includes("อัญเชิญ") && m) { p.field.splice(p.field.indexOf(u), 1); this.run(p, [["cheat", m[1], +m[2], "เดค"]]); }
         if (tgt.includes("กินเหยื่อ")) u.kw["กินเหยื่อ"] = true; if (tgt.includes("บิน")) u.kw["บิน"] = true;
@@ -800,7 +815,7 @@
       p.reserved = p.reserved || new Set(); for (const x of f) p.reserved.add(x);
       const need = c.awakenGem, mineRes = new Set(f);
       const free = (x) => p.hand.includes(x) && (!p.reserved.has(x) || mineRes.has(x));
-      this.choose({ kind: "card", chooser: p, gem: need, cands: p.hand.filter((x) => free(x) && this.gemOf(p, x) > 0), n: 1, why: `ปลุก ${c.name}: เลือกการ์ดทิ้งจ่าย gem ${need}`, src: c,
+      this.choose({ kind: "card", chooser: p, gem: need, cands: p.hand.filter((x) => free(x) && this.gemOf(p, x) > 0), n: 1, why: `ปลุก: เลือกการ์ดทิ้งจ่าย gem ${need}`, src: c,
         valid: free, okLabel: "จ่าย", auto: (n, l) => { const ok = f.filter(free); return ok.reduce((s, x) => s + this.gemOf(p, x), 0) >= need ? ok : this.payFrom(p, l, need) || l; },
         after: (cs) => { for (const x of f) p.reserved.delete(x); this.discardMany(p, cs, "ทิ้งจ่าย gem"); } });
       return true;
@@ -974,7 +989,10 @@
       if (u.born == null) u.born = this.turn;                              // ยังไม่ถูกนับ = เพิ่งเข้าสนาม
       const noFace = u.noface || (this.opt.rush && u.born === this.turn);   // opt.rush (ทดลอง): มอนที่เพิ่งเข้าสนามเทิร์นนี้ ตีมอนได้ แต่ตีผู้เล่นไม่ได้
       if (!e.field.length) return noFace ? [] : ["face"];
-      const t = e.field.filter((x) => !(x.has("ซ่อนตัว") && !x.akw.revealed && e.field.length > 1));
+      // ซ่อนตัว: เลือกเป็นเป้าไม่ได้ ถ้าศัตรูมีตัวที่ไม่ซ่อนให้ตี · ทุกตัวซ่อน = ตีตัวไหนก็ได้ (กันเกมค้าง)
+      const hid = (x) => x.has("ซ่อนตัว") && !x.akw.revealed, open = e.field.filter((x) => !hid(x));
+      if (!open.length && e.field.length > 1 && this.opt.hiddenFace) return noFace ? [] : ["face"];   // มีแต่ตัวซ่อน (≥2) = ตีผู้เล่นได้ แทนที่จะตีอะไรไม่ได้
+      const t = open.length ? open : [...e.field];
       if (u.direct && !noFace) t.push("face");
       return t;
     }
@@ -1112,8 +1130,14 @@
       return false;
     }
     // เวทสวนที่มีค่าสังเวย (พันธสัญญามืด / สัญญาแลกชีพ): ต้องมีมอนฝั่งเราพอ · จ่ายตอนใช้ (คนเลือกเองว่าสังเวยตัวไหน · บอท = ตัวอ่อนสุด โทเคนก่อน)
-    canSac(d, c) { return !c.sac || d.field.length >= c.sac; }
+    canSac(d, c) { return (!c.sac || d.field.length >= c.sac) && (!c.handCost || d.hand.some((x) => x !== c && kindMatch(x.kinds, c.handCost))); }
     async paySac(d, c) {
+      if (c.handCost) {
+        const cs = [...new Set(d.hand.filter((x) => x !== c && kindMatch(x.kinds, c.handCost)))];
+        this.choose({ kind: "card", chooser: d, cands: cs, n: 1, why: `ส่ง${c.handCost} 1 ใบจากมือลงสุสาน (ค่า ${c.name})`, src: c, valid: (x) => d.hand.includes(x),
+          auto: (need, l) => [...l].sort((x, y) => value(x) - value(y)).slice(0, need), after: (sel) => { for (const x of sel) if (d.hand.includes(x)) { d.hand.splice(d.hand.indexOf(x), 1); d.grave.push(x); this.log(`   ${d.name} ส่ง ${x.name} ลงสุสาน`); } } });
+        await this.flush();
+      }
       if (!c.sac) return;
       this.chooseUnits(d, d, [...d.field], c.sac, `สังเวย ${c.sac} ตัวเพื่อใช้ ${c.name}`, (u) => { this.log(`   ${d.name} สังเวย ${u.name}`); this.kill(d, u); this.sacrificed(d); },
         { src: c, auto: (need, cs) => [...cs].sort((x, y) => (!!x.card - !!y.card) || this.eff(d, x) - this.eff(d, y)).slice(0, need) });
@@ -1188,7 +1212,7 @@
         case "defbuff": res.bonus = r.n * (r.perUpgrade ? t.attached.length : r.per ? this.count(d, r.per, "field", t) : 1); if (r.grow) t.power++; this.log(`   ${t.name} +${res.bonus} ในการต่อสู้ครั้งนี้`); return res;
         case "survive": res.survive = true; return res;
         case "bounceself": this.removeTo(d, t, "hand"); this.log(`   ${t.name} กลับขึ้นมือ ยกเลิกการโจมตี`); return { cancel: true };
-        case "hatch": { const saved = d.field.filter((x) => x !== t && x.hatch).map((x) => [x, x.hatch[0]]); t.hatch[0] = 1; this.hatch(d); for (const [x, v] of saved) if (x.hatch) x.hatch[0] = v; if (!d.field.includes(t)) return { cancel: true }; return res; }
+        case "hatch": { const saved = d.field.filter((x) => x !== t && x.hatch).map((x) => [x, x.hatch[0]]); for (const [x] of saved) x.hatch[0] = 999; t.hatch[0] = 1; this.hatch(d); for (const [x, v] of saved) if (x.hatch) x.hatch[0] = v; if (!d.field.includes(t)) return { cancel: true }; return res; }
         case "shield": t.kw["โล่แสง"] = true; return res;
         case "debuff": {
           if (r.pay) this.pickDiscard({ chooser: d, victim: d, n: r.pay, why: `ทิ้งการ์ด ${r.pay} ใบ (ค่าเวทสวน ${choice.card.name})`, after: (cs) => this.discardMany(d, cs, "ทิ้ง") });
@@ -1253,7 +1277,7 @@
     }
     shootWith(p, u, bonus = 0) {
       const e = this.other(p);
-      for (let i = 0; i < (u.card && u.card.shoot2 ? 2 : 1); i++) { const hid = (x) => this.opt.shootHide && x.has("ซ่อนตัว") && !x.akw.revealed && e.field.length > 1;   // opt.shootHide (ทดลอง): ยิงเลือกเป้าที่ซ่อนตัวไม่ได้ (เหมือนโจมตี)
+      for (let i = 0; i < (u.card && u.card.shoot2 ? 2 : 1); i++) { const anyOpen = e.field.some((x) => !(x.has("ซ่อนตัว") && !x.akw.revealed)), hid = (x) => this.opt.shootHide && anyOpen && x.has("ซ่อนตัว") && !x.akw.revealed;   // opt.shootHide (ทดลอง): ยิงเลือกเป้าที่ซ่อนตัวไม่ได้ (เหมือนโจมตี)
         const t = (this.opt.shootHide ? this.byPow(e, this.cands(e, 1, u.shoot + bonus).filter((x) => !hid(x))).slice(0, 1) : this.pick(e, 1, u.shoot + bonus)).filter((x) => !u.h.shootFly || x.has("บิน")); if (t.length) { this.log(`🔫 ${u.name} ยิง ${t[0].name}`); this.emit({ t: "shoot", a: u.uid, b: t[0].uid }); this.kill(e, t[0]); } }
     }
     // กติกาทดลอง: เทิร์นละครั้ง ทิ้ง 1 ใบ แล้วจั่ว 1 ใบ
