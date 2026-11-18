@@ -1325,7 +1325,9 @@
       if (this.opt.wear) await this.botGang(p, e, react, pause);
       if (this.opt.gang && !easy) await this.botGangAttack(p, e, react, pause);
       if (hard) await this.botHardAttacks(p, e, react, pause);
-      for (const u of [...p.field].sort((a, b) => this.eff(p, b) - this.eff(p, a))) {
+      // ตัวที่เพิ่งลง (ตีหน้าไม่ได้) เคลียร์สนามศัตรูก่อน แล้วตัวที่อยู่มาก่อนค่อยตีหน้า (บอทง่ายไม่คิดเรื่องนี้)
+      const fresh = (u) => (!easy && !p.oldOrder && this.opt.rush && u.born === this.turn ? 0 : 1);
+      for (const u of [...p.field].sort((a, b) => fresh(a) - fresh(b) || this.eff(p, b) - this.eff(p, a))) {
         if (easy && roll(0.25) && !u.h.mustAttack) continue;
         while (!this.winner && p.field.includes(u) && !this.canAttack(p, u)) {
           const ts = this.targets(p, u); if (!ts.length) break;

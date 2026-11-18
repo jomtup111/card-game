@@ -2508,10 +2508,11 @@ function hints() {
   if (!HINTS || !V) return;
   if (V.phase === "mull" && !V.mullDone) return hint("mull", "<b>เลือกการ์ดที่จะเปลี่ยน</b> — แตะการ์ดที่ไม่อยากได้ แล้วกดปุ่มเปลี่ยน · แนะนำเก็บมอนสเตอร์ cost ต่ำ 1–2 ใบไว้ลงต้นเกม");
   if (V.phase === "over") return;
-  if (!V.myTurn) { if (V.opp.field.length && V.me.hp < 5) hint("hp", "เสีย HP เมื่อศัตรูตีผู้เล่นตอน<b>สนามเราว่าง</b> — วางมอนสเตอร์ไว้กันไว้เสมอ"); return; }
+  if (!V.myTurn) { if (V.opp.field.length && V.me.hp < Engine.HP) hint("hp", "เสีย HP เมื่อศัตรูตีผู้เล่นตอน<b>สนามเราว่าง</b> — วางมอนสเตอร์ไว้กันไว้เสมอ (ตัวที่ศัตรูเพิ่งลงยังตีเราไม่ได้ในเทิร์นนั้น)"); return; }
   if (mode === "pay") return hint("pay", "การ์ด<b>ขอบฟ้า</b>คือการ์ดที่จะทิ้งจ่าย gem (เกมเลือกตัวที่คุ้มสุดให้) · แตะเพื่อเลือก/ยกเลิก · gem พอแล้วกด <b>อัญเชิญ</b>");
   if (mode === "attack" && V.opp.field.some((x) => V.me.field.filter((y) => !y.atkErr).every((y) => y.power < x.power + (x.armor || 0))) && V.me.field.filter((y) => !y.atkErr).length > 1)
     return hint("gang", "ศัตรูตัวใหญ่เกินจะตีเดี่ยว? แตะ<b>มอนเรืองเขียวตัวอื่นเพิ่ม</b>เพื่อ<b>รุมตีรวม power</b> — ชนะแล้วเป้าจะฆ่ากลับ 1 ตัว");
+  if (V.me.field.some((x) => x.status.includes("เพิ่งลง: ตีหน้าไม่ได้")) && !V.opp.field.length) hint("fresh", "มอนที่<b>เพิ่งลงเทิร์นนี้</b>ยังตีผู้เล่นไม่ได้ — ตีได้ตั้งแต่เทิร์นหน้า (แต่ตีมอนสเตอร์ศัตรูได้ทันที)");
   if (mode === "attack") return hint("aim", "เป้าที่ตีได้มี<b>ขอบแดง</b> พร้อมป้ายบอกผล เช่น “4 vs 3: ชนะ” · ถ้าสนามศัตรูว่าง ให้แตะ/ลากไปที่<b>รูปพระเอกศัตรู</b>");
   if ((V.me.abilities || []).some((a) => !a.err)) hint("abil", "มีปุ่ม <b>✦ สกิล</b> ขึ้นที่แถบล่าง — การ์ดบางใบมีสกิลที่กดใช้เองได้ เช่น ฟื้นคืนจากสุสาน");
   if (V.me.field.some((x) => !x.atkErr)) return hint("ready", "มอนสเตอร์ที่<b>เรืองเขียว</b>โจมตีได้ — แตะมัน แล้วเลือกเป้าหมาย");
