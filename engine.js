@@ -331,7 +331,7 @@
         if ((m = part.match(/^(นำ|อัญเชิญ)(.+?)(?: cost ≤ (\d+))?(?: จาก| 1 (?:ใบ|ตัว)จาก)สุสาน(?:ฟรี|ขึ้นมือ)?(?: (\d+) ตัว)?(?: โดยไม่ต้องตรงเงื่อนไข)?$/)) && !m[2].includes("มังกรโบราณ")) { out.push(["raise", m[2], m[3] ? +m[3] : 99, m[1] === "อัญเชิญ", +(m[4] || 1)]); continue; }
         if ((m = part.match(/^ส่ง(.+?) 1 ใบจาก(มือหรือ)?เดคลงสุสาน$/))) { out.push(m[2] ? ["entomb", m[1], "both"] : ["entomb", m[1]]); continue; }
         if ((m = part.match(/^ทิ้งการ์ด (\d+) ใบบนสุดของเดคลงสุสาน$/))) { out.push(["mill", +m[1]]); continue; }
-        if ((m = part.match(/^อัญเชิญ(.+?)(?: cost ≤ (\d+))?(?: 1 ตัว)? ?จาก(มือ|เดค)(?:หรือเดค)?(?:ได้)?ฟรี(?: 1 ตัว)?.*$/))) { out.push(["cheat", m[1], m[2] ? +m[2] : 99, m[3]]); continue; }
+        if ((m = part.match(/^อัญเชิญ(.+?)(?: cost ≤ (\d+))?(?: 1 ตัว)? ?จาก(มือ|เดค)(หรือเดค)?(?:ได้)?ฟรี(?: 1 ตัว)?.*$/))) { out.push(["cheat", m[1], m[2] ? +m[2] : 99, m[4] ? "มือหรือเดค" : m[3]]); continue; }
         if ((m = part.match(/^ศัตรูทิ้งการ์ดจากมือ (\d+) ใบ$|^ศัตรูทิ้งการ์ดทั้งมือ$/))) { out.push(["edisc", m[1] ? +m[1] : 99]); continue; }
         if (part.startsWith("รวมชิ้นส่วนไททัน") || part.startsWith("อัญเชิญชิ้นส่วนไททันทุกชนิด")) { out.push(["titan", part.includes("อัญเชิญ")]); continue; }
         if (/^ไข่ฝั่งเรา 1 ฟองฟักทันที.*$/.test(part)) { out.push(["hatchone"]); continue; }   // 1 ฟอง = เลือกฟองเดียว (เดิมฟักทุกฟอง)
@@ -692,8 +692,8 @@
             () => zs.flat(), (c) => { const z = zOf(c), fromDeck = z === p.deck; z.splice(z.lastIndexOf(c), 1); p.grave.push(c); this.milled(p, [c], fromDeck ? "ส่งจากเดคลงสุสาน" : "ส่งจากมือลงสุสาน", !fromDeck); })) return true; }
         else if (k === "mill") { const cs = []; for (let i = 0; i < a[1]; i++) if (p.deck.length) { const c = p.deck.pop(); p.grave.push(c); cs.push(c); } this.milled(p, cs, "ทิ้งจากบนเดคลงสุสาน"); }
         else if (k === "cheat") { const [, word, lim, zone] = a; if (p.field.length >= FIELD) continue; const ok = (c) => c.type === "มอน" && kindMatch(c.kinds, word) && c.cost <= lim && !c.kw["หลับใหล"];
-          const zs = zone === "มือ" ? [p.hand, p.deck] : [p.deck], cs = [...new Set(zs.flatMap((z) => z.filter(ok)))], zOf = (c) => zs.find((z) => z.includes(c));
-          if (cards(cs, 1, `เลือก${word} 1 ตัว${zone === "มือ" ? "จากมือหรือเดค" : "จากเดค"}อัญเชิญฟรี`, () => { for (const z of zs) { const cand = z.filter(ok); if (cand.length) return [cand.sort((x, y) => y.base - x.base)[0]]; } return []; },
+          const zs = zone === "มือหรือเดค" ? [p.hand, p.deck] : zone === "มือ" ? [p.hand] : [p.deck], cs = [...new Set(zs.flatMap((z) => z.filter(ok)))], zOf = (c) => zs.find((z) => z.includes(c));
+          if (cards(cs, 1, `เลือก${word} 1 ตัวจาก${zone}อัญเชิญฟรี`, () => { for (const z of zs) { const cand = z.filter(ok); if (cand.length) return [cand.sort((x, y) => y.base - x.base)[0]]; } return []; },
             () => zs.flat(), (c) => { if (p.field.length >= FIELD) return; const z = zOf(c); z.splice(z.indexOf(c), 1); this.place(p, c); })) return true; }
         else if (k === "edisc") {                                          // ศัตรูทิ้งจากมือ: ศัตรูเลือกเอง (2026-11-18) · "ดูมือศัตรู แล้วเลือก" = เราเลือก
           const look = a[2] === "look";
