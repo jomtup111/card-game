@@ -336,7 +336,7 @@
         if (part.startsWith("รวมชิ้นส่วนไททัน") || part.startsWith("อัญเชิญชิ้นส่วนไททันทุกชนิด")) { out.push(["titan", part.includes("อัญเชิญ")]); continue; }
         if (/^ไข่ฝั่งเรา 1 ฟองฟักทันที.*$/.test(part)) { out.push(["hatchone"]); continue; }   // 1 ฟอง = เลือกฟองเดียว (เดิมฟักทุกฟอง)
         if (/^ไข่(?:ทุกฟอง)?ฝั่งเรา(?: 1 ฟอง)?ฟักทันที.*$/.test(part)) { out.push(["hatchall"]); continue; }
-        if ((m = part.match(/^(?:ปลุก|อัญเชิญ)มังกรโบราณ(ทุกตัว| 1 ตัว)จากสุสาน.*$/))) { out.push(["awakenall", m[1].includes("ทุก") ? 99 : 1]); continue; }
+        if ((m = part.match(/^(?:ปลุก|อัญเชิญ)มังกรโบราณ(ทุกตัว| 1 ตัว)จากสุสาน.*$/))) { out.push(["awakenall", m[1].includes("ทุก") ? 99 : 1, /สุสานฟรี/.test(part)]); continue; }
         return [];
       }
       return out;
@@ -706,7 +706,8 @@
         }
         else if (k === "hatchall") { for (const u of p.field) if (u.hatch) u.hatch[0] = 1; this.hatch(p); }
         else if (k === "awakenall") {                                      // ปลุก N ตัว: เลือกเองว่าตัวไหน (เฉพาะการ์ดหลับใหลในสุสาน)
-          const wake = (c) => { if (p.field.length < FIELD && p.grave.includes(c)) this.payAwaken(p, c, () => { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); }); };
+          const up = (c) => { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); this.log(`🐉 ${c.name} ตื่นจากสุสาน`); };
+          const wake = (c) => { if (p.field.length < FIELD && p.grave.includes(c)) { if (a[2]) up(c); else this.payAwaken(p, c, () => up(c)); } };   // a[2] = ฟรี (ไม่ต้องจ่าย gem)
           if (cards(p.grave.filter((c) => c.kw["หลับใหล"]), a[1], `เลือกมังกรโบราณ ${a[1]} ตัวจากสุสานที่จะปลุก`, (l) => l, () => p.grave, wake)) return true;
         }
         else if (k === "own") {
