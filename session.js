@@ -11,7 +11,7 @@
   class Session {
     // o: { cards: [Card], decks: [สาย, สาย], names, seats, seed, onView(i, view), onLog(s), ask(i, payload) → Promise<ตำแหน่งตัวเลือก|null>, botDelay }
     constructor(o) {
-      Object.assign(this, { botDelay: 600, watch: false }, o);
+      Object.assign(this, { botDelay: 600, watch: false, turnSec: 75, deciding: null }, o);
       // บันทึกสำหรับเล่นซ้ำ (รายงานบัค): seed + เดค + ทุกคำสั่งของผู้เล่นคน + คำตอบเวทสวน → เกมเดิมเป๊ะ
       this.rec = { seed: o.seed, decks: o.decks, seats: o.seats, names: o.names, levels: [], acts: [], answers: [] };
       // เดค: ชื่อสาย (จัดอัตโนมัติ) | { arch } | { name, ids: [รหัสการ์ด] } (จัดเอง ต้องผ่าน validateDeck มาแล้ว)
@@ -35,6 +35,9 @@
       this.fxq = []; this.G.onFx = (e) => this.fxq.push(e);
       this.phase = "mull"; this.mullDone = [false, false]; this.busy = false;
       this.reactFn = (d, info) => this.react(d, info);
+      // ผู้เล่นคน (local/remote) เลือกการ์ดที่จะทิ้งเอง · บอทเลือกอัตโนมัติ
+      this.G.picker = (p) => this.seats[this.G.P.indexOf(p)] !== "bot";
+      this.G.flushFn = () => this.drain();
     }
     start() {
       this.rec.levels = this.G.P.map((p) => [p.level || null, p.bonusDraw || 0]);
@@ -87,6 +90,7 @@
       });
       return {
         seat: i, phase: this.phase, mullDone: this.mullDone[i], turn: G.turn, myTurn: my, busy: this.busy,
+        paused: this.deciding != null && this.deciding !== G.cur, turnSec: this.turnSec, cur: G.cur,
         whoseTurn: G.P[G.cur].name, winner: G.winner ? (G.winner === p ? "me" : "opp") : null,
         me: { name: p.name, hero: this.heroes[i], arch: this.deckNames[i], hp: p.hp, deck: p.deck.length, grave: p.grave.map((c) => c.name), hand,
               field: p.field.map((x) => unit(p, x, true)), spellUsed: p.spellUsed, spellMax: G.spellCap(p),
@@ -132,6 +136,7 @@
           else if (!G.targets(p, u).includes(t)) err = "ตีเป้าหมายนี้ไม่ได้";
           else err = await G.attack(p, u, t, this.reactFn);
         } else err = "คำสั่งไม่ถูกต้อง";
+        await this.drain();
       } finally { this.busy = false; }
       if (G.winner) this.phase = "over";
       this.push();
@@ -140,16 +145,47 @@
 
     async nextTurn() {
       const G = this.G;
-      if (!G.winner) G.startTurn();
+      if (!G.winner) { G.startTurn(); if (G.pending.length) { this.busy = true; try { await this.drain(); } finally { this.busy = false; } } }
       if (G.winner) { this.phase = "over"; return this.push(); }
       if (this.seats[G.cur] === "bot") {
         this.busy = true; this.push(); await sleep(this.botDelay);
-        await G.botTurn(this.reactFn, async () => { this.push(); await sleep(this.botDelay); });
+        await G.botTurn(this.reactFn, async () => { await this.drain(); this.push(); await sleep(this.botDelay); });
+        await this.drain();
         this.busy = false;
         if (G.winner) { this.phase = "over"; return this.push(); }
         G.endTurn(); return this.nextTurn();
       }
       this.push();
+    }
+
+    // ผู้เล่นคนเลือกการ์ดที่จะทิ้ง (engine พักไว้ใน G.pending) → ถามทีละเรื่อง แล้วทำสกิลที่เหลือต่อ
+    async drain() {
+      const G = this.G;
+      while (G.pending.length && !G.winner) {
+        const pd = G.pending.shift(), i = G.P.indexOf(pd.chooser);
+        const live = pd.cands.filter((x) => pd.valid(x)), need = Math.min(pd.n, live.length);
+        let cs;
+        if (!need || (!pd.optional && !pd.gem && need >= live.length)) cs = G.answerPick(pd, null);   // ไม่มีอะไรให้เลือกแล้ว
+        else {
+          this.deciding = i; this.push();
+          const head = pd.src ? `${pd.src.name}: ${pd.why}` : pd.why;
+          const payload = pd.kind === "unit"
+            ? { kind: "unit", n: need, optional: !!pd.optional, head, sub: `แตะเลือก ${need} ตัว`, mine: pd.side === pd.chooser,
+                uids: pd.cands.map((u) => (live.includes(u) ? u.uid : null)), src: pd.self ? pd.self.uid : null, opts: [] }
+            : { kind: "discard", n: need, optional: !!pd.optional, enemy: pd.kind === "discard" && pd.victim !== pd.chooser, head,
+                sub: pd.sub || (pd.gem ? `เลือกการ์ดให้ gem รวม ≥ ${pd.gem}` : pd.kind !== "discard" ? `เลือก ${need} ใบ` : pd.victim !== pd.chooser ? `เลือกการ์ดในมือ${pd.victim.name} ${need} ใบให้ทิ้ง` : pd.optional ? "เลือกการ์ดที่จะทิ้ง หรือกดไม่ทิ้ง" : `เลือกการ์ดที่จะทิ้ง ${need} ใบ`),
+                cards: pd.cands.map((c) => (live.includes(c) ? c.id : null)), okLabel: pd.okLabel, skipLabel: pd.skipLabel,
+                gem: pd.gem || 0, gems: pd.gem ? pd.cands.map((c) => G.gemOf(pd.chooser, c)) : null,
+                opts: [] };                                                   // เครื่องเพื่อนรุ่นเก่า: เห็นเป็นหน้าต่างตอบโต้ว่าง กดผ่าน = เลือกอัตโนมัติ
+          let k; try { k = await this.ask(i, payload); } finally { this.deciding = null; }
+          this.rec.answers.push(k);
+          cs = G.answerPick(pd, k);
+        }
+        const n0 = G.pending.length; pd.after(cs);
+        if (pd.rest) { if (G.pending.length > n0) { const np = G.pending[G.pending.length - 1], r0 = np.rest, r1 = pd.rest; np.rest = () => { if (r0) r0(); r1(); }; } else pd.rest(); }   // ผลที่เลือกไปสร้างคำถามต่อ → สกิลที่เหลือรอหลังคำถามนั้น
+        G.checkEnd();
+      }
+      if (G.winner) { G.pending.length = 0; this.phase = "over"; }
     }
 
     // ฝ่ายรับเลือกตอบโต้ (เวทสวน / พรีกายจากมือ)
@@ -162,13 +198,14 @@
         if (!keep.length) return null;
         info = { ...info, opts: keep };
       }
-      this.push();
+      this.deciding = i; this.push();                                   // อีกฝ่ายกำลังเลือก → เวลาเทิร์นของคนตีหยุดเดิน
       const payload = {
         head: info.etb ? `${a.name} อัญเชิญ ${info.etb.name}` : info.spell ? `${a.name} ร่ายเวท ${info.spell.name}` : `${info.attacker.name} โจมตี ${info.targetIsPlayer ? "คุณ (ผู้เล่น)" : info.target.name}`,
         sub: info.etb ? `ยกเลิกสกิลลงสนาม: ${info.etb.ab}` : info.spell ? info.spell.ab : "เลือกเวทสวนเพื่อตอบโต้ หรือทิ้งมอนพรีกายจากมือรับแทน",
         opts: info.opts.map((o) => ({ id: o.card.id, kind: o.kind })),
       };
-      const k = await this.ask(i, payload); this.rec.answers.push(k);
+      let k; try { k = await this.ask(i, payload); } finally { this.deciding = null; }
+      this.rec.answers.push(k);
       return Number.isInteger(k) && info.opts[k] ? info.opts[k] : null;
     }
   }

@@ -66,6 +66,7 @@
   .card.target { cursor: crosshair; filter: drop-shadow(0 0 7px var(--bad)) drop-shadow(0 0 2px var(--bad)); animation: aim .8s ease-in-out infinite; }
   @keyframes aim { 50% { transform: scale(1.04); } }
   .card.dim { opacity: .45; }
+  .askclock { text-align: center; margin-top: 8px; font-size: 16px; color: var(--hi); } .askclock.low { color: var(--bad); animation: blink .5s infinite; }
   .card.fodder { transform: translateY(-12px); filter: drop-shadow(0 0 7px #40b8d8) drop-shadow(0 0 2px #40b8d8); }
   .card.dead::after { content: "ยังไม่รองรับ"; position: absolute; left: 0; right: 0; bottom: 38%; text-align: center; font-size: 10px; background: #000b; color: #ffb0b0; }
   .card.enter { animation: enter .45s cubic-bezier(.2, 1.4, .4, 1); }
@@ -304,6 +305,9 @@
   .subpanel .btns .big { flex: 1; }
   .lvrow { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; } .lvrow > span:first-child { min-width: 64px; }
   .lvrow .seg { display: flex; gap: 6px; flex: 1; } .lvrow .seg button { flex: 1; min-height: 40px; }
+  .tsec { margin: 6px 0 10px; } .tsec .seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 4px; margin-top: 4px; }
+  .tsec .seg button { min-height: 36px; padding: 4px 2px; font-size: 13px; min-width: 0; white-space: nowrap; }
+  .tsec .seg button.on { border-image-source: url(img/ui_btn_gold.png); color: #1b1630; }
   .lvrow .seg button.on { border-image-source: url(img/ui_btn_gold.png); color: #1b1630; }
   .lvdesc { font-size: 12.5px; min-height: 18px; margin-bottom: 4px; }
   .friendgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -692,7 +696,9 @@
   <div class="subpanel panel" id="pfriend" hidden>
     <h3>เล่นกับเพื่อน (ออนไลน์)</h3>
     <div class="friendgrid">
-      <div><p class="muted">สร้างห้องแล้วส่งรหัสให้เพื่อน</p><button class="main big" id="host">สร้างห้อง</button></div>
+      <div><p class="muted">สร้างห้องแล้วส่งรหัสให้เพื่อน</p>
+        <div class="tsec"><span class="muted">เวลาต่อเทิร์น</span><span class="seg" id="turnsec"><button data-v="45">45 วิ</button><button data-v="75">75 วิ</button><button data-v="120">2 นาที</button><button data-v="0">ไม่จำกัด</button></span></div>
+        <button class="main big" id="host">สร้างห้อง</button></div>
       <div><p class="muted">มีรหัสจากเพื่อน?</p><label><input id="joincode" maxlength="5" placeholder="รหัส 5 ตัว" style="text-transform:uppercase"><button class="main" id="join">เข้าห้อง</button><button id="watchbtn" title="ดูเพื่อนเล่น (กดอะไรไม่ได้)">👀 ดู</button></label></div>
     </div>
     <div id="netmsg" class="muted"></div>
@@ -817,7 +823,7 @@ const MASCOTS = ["hum_hans", "hel_grib", "hea_luz", "spi_mushy", "bea_nutty", "d
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const u = (x, y, w, h, extra = "") => `style="--x:${x};--y:${y};--w:${w};--h:${h};${extra}"`;
-const SET = (() => { let o = {}; try { o = JSON.parse(localStorage.getItem("settings") || "{}"); } catch {} return Object.assign({ vol: 70, music: 40, speed: 1, hints: false, tips: true, botLevel: "normal" }, o); })();
+const SET = (() => { let o = {}; try { o = JSON.parse(localStorage.getItem("settings") || "{}"); } catch {} return Object.assign({ vol: 70, music: 40, speed: 1, hints: false, tips: true, botLevel: "normal", turnSec: 75 }, o); })();
 const BOTDELAY = 600;
 const saveSet = () => { try { localStorage.setItem("settings", JSON.stringify(SET)); } catch {} };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms * SET.speed));
@@ -930,6 +936,7 @@ function unitCard(x) {
 // role: "bot" (เล่นกับบอท) | "host" (เจ้าของห้อง) | "guest" (เข้าห้องเพื่อน)
 // เจ้าของห้อง/โหมดบอท: เกมรันใน Session บนเครื่องนี้ · ผู้เข้าห้อง: ได้แค่ view จากเจ้าของห้องแล้วส่งคำสั่งกลับไป
 let role = null, S = null, peer = null, conn = null, V = null, pendingAsk = null, overShown = false;
+let targetAsk = null, ownAsk = null;   // ownAsk = ปิดหน้าต่างเลือกที่เปิดอยู่ (ตอบ null = เกมเลือกให้)   // กำลังเลือกเป้าของสกิลบนกระดาน { p, src, picked:Set, resolve }
 let mode = "idle", sel = null, fodder = new Set(), toastTimer = 0, gang = [];   // gang = uid มอนที่รุมตีด้วย (นอกจาก sel)
 const log = (s) => { const d = document.createElement("div"); if (s.startsWith("——")) d.className = "turn"; d.textContent = s; $("log").appendChild(d); $("log").scrollTop = 1e9; };
 const toast = (s) => { $("msg").textContent = s; $("msg").className = "px-text err"; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastTimer = 0; render(); }, 2500); };
@@ -1355,11 +1362,12 @@ function render() {
   };
   // สนามศัตรู (ตอนเลือกเป้า: ขึ้นผลที่คาดไว้บนเป้าแต่ละตัว)
   const ef = $("efield"); ef.innerHTML = "";
+  const TA = targetAsk && targetAsk.p, taCls = (x) => { const k = TA.uids.indexOf(x.uid); return k < 0 ? "dim" : targetAsk.picked.has(k) ? "sel click" : (TA.mine ? "ready" : "target") + " click"; };
   for (const x of V.opp.field) {
-    const hit = targets.includes(x.uid), st = hit ? [predOf(x), ...x.status] : x.status;
-    const el = cardEl(unitCard(x), { powerNow: x.power, status: st, pred: hit, cls: (hit ? "target" : "") + unitAnim(x), unit: x, minion: true });
+    const hit = !TA && targets.includes(x.uid), st = hit ? [predOf(x), ...x.status] : x.status;
+    const el = cardEl(unitCard(x), { powerNow: x.power, status: st, pred: hit, cls: (TA ? (TA.mine ? "" : taCls(x)) : hit ? "target" : "") + unitAnim(x), unit: x, minion: true });
     el.dataset.uid = x.uid;
-    el.onclick = () => { if (!hit) return; if (group.length > 1) act({ t: "gang", uids: group.map((g) => g.uid), target: x.uid }); else act({ t: "attack", uid: sel, target: x.uid }); };
+    el.onclick = () => { if (TA) return targetClick(x.uid); if (!hit) return; if (group.length > 1) act({ t: "gang", uids: group.map((g) => g.uid), target: x.uid }); else act({ t: "attack", uid: sel, target: x.uid }); };
     ef.appendChild(el);
   }
   for (let i = V.opp.field.length; i < Engine.FIELD; i++) ef.insertAdjacentHTML("beforeend", `<div class="slot"></div>`);
@@ -1367,11 +1375,11 @@ function render() {
   // สนามเรา
   const mf = $("mfield"); mf.innerHTML = "";
   for (const x of V.me.field) {
-    const cls = !V.myTurn ? "" : mode === "attack" && (x.uid === sel || gang.includes(x.uid)) ? "sel" : !x.atkErr ? "ready click" : "click";
+    const cls = TA ? (TA.mine ? taCls(x) : "") : !V.myTurn ? "" : mode === "attack" && (x.uid === sel || gang.includes(x.uid)) ? "sel" : !x.atkErr ? "ready click" : "click";
     const el = cardEl(unitCard(x), { powerNow: x.power, status: x.status, cls: cls + unitAnim(x), unit: x, minion: true });
     el.addEventListener("pointerdown", (ev) => startArrow(ev, x));
     el.dataset.uid = x.uid;
-    el.onclick = () => clickUnit(x); mf.appendChild(el);
+    el.onclick = () => (TA ? targetClick(x.uid) : clickUnit(x)); mf.appendChild(el);
   }
   for (let i = V.me.field.length; i < Engine.FIELD; i++) mf.insertAdjacentHTML("beforeend", `<div class="slot"></div>`);
   // มือ
@@ -1403,7 +1411,11 @@ function render() {
   $("endturn").classList.toggle("ready", V.myTurn && mode === "idle" && !V.me.hand.some((h) => !h.err && (h.costNow == null || h.costNow === 0 || h.auto.length)) && !V.me.field.some((x) => !x.atkErr));
   turnTimer();
   $("cancel").style.display = mode === "pay" || mode === "attack" ? "" : "none";
-  if (mode === "pay") {
+  if (TA) {
+    $("paybox").innerHTML = `<span class="px-text">${TA.n > 1 ? `${targetAsk.picked.size}/${TA.n}` : ""}</span>` + (TA.n > 1 ? `<button class="main" id="taok" ${targetAsk.picked.size === TA.n ? "" : "disabled"}>ยืนยัน</button>` : "") + (TA.optional ? `<button id="taskip">ข้าม</button>` : "");
+    if ($("taok")) $("taok").onclick = () => targetAsk && targetAsk.picked.size === TA.n && targetAsk.resolve([...targetAsk.picked]);
+    if ($("taskip")) $("taskip").onclick = () => targetAsk && targetAsk.resolve([]);
+  } else if (mode === "pay") {
     const need = V.me.hand[sel].costNow, have = [...fodder].reduce((s, k) => s + V.me.hand[k].gem, 0);
     $("paybox").innerHTML = `<span class="px-text">gem ${have}/${need}</span><button class="main" id="dosum" ${have >= need ? "" : "disabled"}>อัญเชิญ</button>`;
     $("dosum").onclick = () => act({ t: "summon", k: sel, f: [...fodder] });
@@ -1419,11 +1431,13 @@ function render() {
     $("msg").textContent =
       V.phase === "mull" ? (V.mullDone ? "รออีกฝ่ายเลือก mulligan…" : "เลือกการ์ดที่จะเปลี่ยน (mulligan) แล้วกดปุ่ม")
       : V.phase === "over" ? (V.winner === "me" ? "คุณชนะ!" : "คุณแพ้")
+      : TA ? `🎯 ${TA.head}`
       : mode === "pay" ? `เลือกการ์ดที่จะทิ้งจ่าย gem ${V.me.hand[sel].costNow} (เลือกให้แล้ว เปลี่ยนได้ · ทิ้งเกินได้)`
       : mode === "attack" ? (group.length > 1 ? `รุมตีด้วย ${group.length} ตัว (รวม ${group.reduce((s, g) => s + g.power, 0)}) — แตะเป้าหมาย` : `เลือกเป้าหมายของ ${attacker ? unitCard(attacker).name : ""} · แตะมอนเรืองเขียวตัวอื่นเพื่อรุมตีรวม`)
       : V.myTurn ? (V.turn === 1 ? "ตาคุณ (เทิร์นแรกของเกมโจมตีไม่ได้)" : "ตาคุณ")
       : `ตาของ ${V.whoseTurn}…`;
   }
+  aimRefresh();
 }
 
 // พรมสนาม: คลุมจากสนามศัตรูถึงสนามเรา
@@ -1460,6 +1474,35 @@ function startDrag(ev, el, h, k) {
   };
   addEventListener("pointermove", move); addEventListener("pointerup", up);
 }
+// ลูกศรเล็ง: เลือกมอนจะโจมตีแล้ว (แตะหรือลาก) หรือกำลังเลือกเป้าของสกิล → ลูกศรจากตัวที่ใช้ไปตามเมาส์/นิ้วเสมอ
+let aimDrag = false, aimPt = null;
+function aimSrc() {
+  if (targetAsk) return targetAsk.src ? unitEl(targetAsk.src) || $("mface") : $("mface");
+  if (mode === "attack" && sel != null) return unitEl(sel);
+  return null;
+}
+function aimDraw(x, y) {
+  const svg = $("arrow"), path = $("arrowpath"), el = aimSrc();
+  if (!el || x == null) { if (!aimDrag) svg.classList.remove("on"); return; }
+  const r = el.getBoundingClientRect(), ox = r.left + r.width / 2, oy = r.top + r.height / 2;
+  if (Math.hypot(x - ox, y - oy) < 30) { svg.classList.remove("on"); return; }
+  path.setAttribute("d", `M${ox},${oy} Q${(ox + x) / 2},${Math.min(oy, y) - 80} ${x},${y}`); svg.classList.add("on");
+}
+// เริ่มเล็งใหม่ (เลือกตัวโจมตีใหม่ / สกิลถามเป้า): จอสัมผัสไม่มีเมาส์ชี้ → ลูกศรชี้เป้าตัวแรกที่เลือกได้ไว้ก่อน แตะ/ลากนิ้วแล้วค่อยตาม
+let aimKey = null, aimTouch = true;
+function aimDefault() {
+  const t = document.querySelector("#efield .card.target") || document.querySelector("#eface.target") || (targetAsk && targetAsk.p.mine && document.querySelector("#mfield .card.ready"));
+  if (!t) return null; const r = t.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2];
+}
+function aimRefresh() {
+  if (aimDrag) return;
+  const key = targetAsk ? "t:" + targetAsk.p.head + targetAsk.p.uids.join() : mode === "attack" && sel != null ? "a:" + sel : null;
+  if (key !== aimKey) { aimKey = key; if (aimTouch) aimPt = null; }
+  const pt = aimPt || (key ? aimDefault() : null);
+  aimDraw(pt && pt[0], pt && pt[1]);
+}
+addEventListener("pointerdown", (e) => { aimTouch = e.pointerType !== "mouse"; }, { capture: true, passive: true });
+addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") aimTouch = false; else if (!e.buttons) return; aimPt = [e.clientX, e.clientY]; if (!aimDrag) aimDraw(e.clientX, e.clientY); }, { passive: true });
 // ลากลูกศรจากมอนของเราไปเป้าหมาย = โจมตี (มีกลุ่มรุมอยู่ก็รุมตี) · ขยับไม่ถึง 10px ถือว่าแตะ (เลือก/เพิ่มเข้ากลุ่ม)
 function startArrow(ev, x) {
   if (ev.button > 0 || !V || !V.myTurn || (mode !== "idle" && mode !== "attack") || x.atkErr) return;
@@ -1469,7 +1512,7 @@ function startArrow(ev, x) {
   const pick = (e) => { svg.classList.remove("on"); const t = document.elementFromPoint(e.clientX, e.clientY); svg.classList.add("on"); return t && (t.closest("#efield .card[data-uid]") || t.closest("#eface")); };
   const move = (e) => {
     if (!on && Math.hypot(e.clientX - sx, e.clientY - sy) < 10) return;
-    if (!on) { on = true; hideTip(); if (mode !== "attack" || (sel !== x.uid && !gang.includes(x.uid))) { sel = x.uid; gang = []; mode = "attack"; render(); } svg.classList.add("on"); }
+    if (!on) { on = true; aimDrag = true; hideTip(); if (mode !== "attack" || (sel !== x.uid && !gang.includes(x.uid))) { sel = x.uid; gang = []; mode = "attack"; render(); } svg.classList.add("on"); }
     const mx = (ox + e.clientX) / 2, my = Math.min(oy, e.clientY) - 80;
     path.setAttribute("d", `M${ox},${oy} Q${mx},${my} ${e.clientX},${e.clientY}`);
     const t = pick(e); if (over && over !== t) over.classList.remove("droptarget"); over = t; if (t) t.classList.add("droptarget");
@@ -1477,7 +1520,7 @@ function startArrow(ev, x) {
   const up = (e) => {
     removeEventListener("pointermove", move); removeEventListener("pointerup", up);
     if (!on) return;
-    svg.classList.remove("on"); if (over) over.classList.remove("droptarget");
+    aimDrag = false; svg.classList.remove("on"); if (over) over.classList.remove("droptarget");
     dragJustEnded = true; setTimeout(() => (dragJustEnded = false), 50);
     const t = pick(e); svg.classList.remove("on"); if (!t) return;
     if (t.id === "eface") return $("eface").onclick();
@@ -1485,17 +1528,21 @@ function startArrow(ev, x) {
   };
   addEventListener("pointermove", move); addEventListener("pointerup", up);
 }
-// เวลาเทิร์น (เฉพาะออนไลน์): 75 วิ หมดแล้วจบเทิร์นให้อัตโนมัติ
-const TURN_SEC = 75; let turnKey = null, turnStart = 0, turnTick = 0;
+// เวลาเทิร์น (เฉพาะออนไลน์): เจ้าของห้องตั้งตอนสร้างห้อง (ค่าเริ่ม 75 วิ · 0 = ไม่จำกัด) หมดแล้วจบเทิร์นให้อัตโนมัติ
+// หยุดเดินระหว่างที่อีกฝ่ายกำลังเลือกเวทสวน (V.paused)
+let turnKey = null, turnUsed = 0, turnLast = 0, turnTick = 0;
 function turnTimer() {
   const online = role === "host" || role === "guest";
+  const sec = V && V.turnSec != null ? V.turnSec : 75;
   const key = V && V.phase === "play" ? `${V.turn}:${V.whoseTurn}` : null;
-  if (key !== turnKey) { turnKey = key; turnStart = Date.now(); }
+  if (key !== turnKey) { turnKey = key; turnUsed = 0; turnLast = Date.now(); }
   clearInterval(turnTick);
-  if (!online || !key) { $("endturn").style.setProperty("--left", "360deg"); return; }
+  if (!online || !key || !sec) { $("endturn").style.setProperty("--left", "360deg"); return; }
   const tick = () => {
-    const left = Math.max(0, TURN_SEC - (Date.now() - turnStart) / 1000);
-    $("endturn").style.setProperty("--left", `${(left / TURN_SEC) * 360}deg`);
+    const now = Date.now(); if (!V.paused) turnUsed += (now - turnLast) / 1000; turnLast = now;
+    const left = Math.max(0, sec - turnUsed);
+    $("endturn").style.setProperty("--left", `${(left / sec) * 360}deg`);
+    if (left <= 0 && V.cur === V.seat && ownAsk) { ownAsk(); return; }                // หมดเวลาตอนกำลังเลือกเป้า/การ์ด → เกมเลือกให้ แล้วค่อยจบเทิร์น
     if (left <= 0 && V.myTurn) { clearInterval(turnTick); mode = "idle"; sel = null; gang = []; act({ t: "end" }); }
   };
   tick(); turnTick = setInterval(tick, 500);
@@ -1556,6 +1603,8 @@ document.addEventListener("click", (e) => { if (!$("side").contains(e.target)) $
 
 // ฝ่ายรับเลือกตอบโต้: เวทสวน / พรีกายจากมือ → ตำแหน่งตัวเลือก หรือ null
 function askModal(p) {
+  if (p.kind === "discard") return askDiscard(p);
+  if (p.kind === "unit") return askTarget(p);
   if (window.AUTOPLAY) return Promise.resolve(p.opts.length && Math.random() < 0.6 ? 0 : null);
   hint("react", "ศัตรูกำลังโจมตีหรือร่ายเวท — แตะการ์ดเพื่อ<b>ตอบโต้</b> หรือกด “ไม่ตอบโต้” เก็บไว้ใช้ทีหลัง (ตอบโต้ได้ 1 ครั้งต่อเทิร์นศัตรู)");
   return new Promise((resolve) => {
@@ -1566,11 +1615,72 @@ function askModal(p) {
     p.opts.forEach((o, i) => {
       const el = cardEl(ROW[o.id], { cls: "click" });
       el.title = o.kind === "counter" ? "ใช้เวทสวน" : "ทิ้งรับแทน";
-      el.onclick = () => { m.remove(); resolve(i); }; box.appendChild(el);
+      el.onclick = () => done(i); box.appendChild(el);
     });
-    m.querySelector("#noreact").onclick = () => { m.remove(); resolve(null); };
+    let fin = false; const done = (r) => { if (fin) return; fin = true; m.remove(); resolve(r); };
+    m.querySelector("#noreact").onclick = () => done(null);
+    askCountdown(m, () => done(null));
     document.body.appendChild(m);
   });
+}
+// ออนไลน์: เลือกในตาของอีกฝ่าย (เวทสวน / ศัตรูสั่งทิ้ง ฯลฯ) มีเวลา ASK_SEC วิ หมดแล้ว = ไม่ตอบโต้ / เกมเลือกให้ (อีกฝ่ายไม่ต้องรอนาน)
+const ASK_SEC = 20;
+function askCountdown(m, expire) {
+  if ((role !== "host" && role !== "guest") || !V || V.cur === V.seat) return;
+  const t0 = Date.now(), el = document.createElement("div"); el.className = "askclock px-text";
+  m.querySelector(".box").appendChild(el);
+  let iv = 0, seen = false;
+  const tick = () => {
+    if (m.isConnected) seen = true; else if (seen) return clearInterval(iv);   // หน้าต่างถูกปิดไปแล้ว
+    const left = Math.max(0, Math.ceil(ASK_SEC - (Date.now() - t0) / 1000));
+    el.textContent = `⏳ ${left} วิ`; el.classList.toggle("low", left <= 5);
+    if (left <= 0) { clearInterval(iv); expire(); }
+  };
+  iv = setInterval(tick, 250); tick();
+}
+// เลือกการ์ดที่จะทิ้งเอง (สกิลทิ้งการ์ด / ศัตรูสั่งให้ทิ้ง / ดูมือศัตรู) → ตำแหน่งใน p.cards · ไม่บังคับ: กด "ไม่ทิ้ง" = []
+function askDiscard(p) {
+  const ok = p.cards.map((id, k) => (id ? k : -1)).filter((k) => k >= 0);
+  if (window.AUTOPLAY) return Promise.resolve(p.gem ? ok : p.optional && Math.random() < 0.3 ? [] : ok.slice(0, p.n));
+  hint("discard", "สกิลให้<b>เลือกการ์ดเอง</b> (ทิ้ง / ค้นหา / ชุบชีวิต ฯลฯ): แตะการ์ดให้ครบตามจำนวน แล้วกด <b>ยืนยัน</b>");
+  return new Promise((resolve) => {
+    const picked = new Set(), m = document.createElement("div"); m.className = "modal";
+    m.innerHTML = `<div class="box panel"><h2 class="px-text">${esc(p.head)}</h2><p class="muted">${esc(p.sub)}</p>
+      <div class="cards"></div><div class="btns">${p.optional ? `<button id="dskip">${esc(p.skipLabel || "ไม่ทิ้ง")}</button>` : ""}<button class="main" id="dok"></button></div></div>`;
+    const box = m.querySelector(".cards"), okb = m.querySelector("#dok");
+    const gemSum = () => [...picked].reduce((s, k) => s + (p.gems[k] || 0), 0);
+    const ready = () => (p.gem ? picked.size > 0 && gemSum() >= p.gem : picked.size === p.n);
+    const upd = () => { okb.textContent = p.gem ? `${p.okLabel || "ยืนยัน"} (gem ${gemSum()}/${p.gem})` : `${p.okLabel || "ยืนยัน"} (${picked.size}/${p.n})`; okb.disabled = !ready(); for (const el of box.children) el.classList.toggle("fodder", picked.has(+el.dataset.k)); };
+    for (const k of ok) {
+      const el = cardEl(ROW[p.cards[k]], { cls: "click" }); el.dataset.k = k;
+      el.onclick = () => { SFX.play("click"); if (picked.has(k)) picked.delete(k); else if (p.gem) picked.add(k); else if (p.n === 1) { picked.clear(); picked.add(k); } else if (picked.size < p.n) picked.add(k); upd(); };
+      box.appendChild(el);
+    }
+    let fin = false; const done = (r) => { if (fin) return; fin = true; ownAsk = null; m.remove(); resolve(r); };
+    ownAsk = () => done(null);
+    okb.onclick = () => ready() && done([...picked]);
+    if (p.optional) m.querySelector("#dskip").onclick = () => done([]);
+    upd(); document.body.appendChild(m);
+    askCountdown(m, () => done(null));
+  });
+}
+// เลือกเป้าของสกิลบนกระดาน (ทำลาย / ยึด / แช่แข็ง / บัฟ ฯลฯ) → ตำแหน่งใน p.uids · มอนที่เลือกได้ขอบแดง (ศัตรู) / เขียว (ของเรา) · ลูกศรจากตัวที่ใช้สกิล
+function askTarget(p) {
+  const ok = p.uids.map((u, k) => (u != null ? k : -1)).filter((k) => k >= 0);
+  if (window.AUTOPLAY) return Promise.resolve(p.optional && Math.random() < 0.3 ? [] : ok.sort(() => Math.random() - 0.5).slice(0, p.n));
+  hint("target", "สกิลให้<b>เลือกเป้าเอง</b>: แตะมอนสเตอร์ที่มีขอบเรืองแสง");
+  return new Promise((resolve) => {
+    mode = "idle"; sel = null; gang = []; fodder = new Set();
+    targetAsk = { p, src: p.src, picked: new Set(), resolve: (r) => { targetAsk = null; ownAsk = null; resolve(r); render(); } };
+    ownAsk = () => targetAsk && targetAsk.resolve(null);
+    render();
+  });
+}
+function targetClick(uid) {
+  const t = targetAsk; if (!t) return; const k = t.p.uids.indexOf(uid); if (k < 0) return;
+  SFX.play("click");
+  if (t.p.n === 1) return t.resolve([k]);
+  t.picked.has(k) ? t.picked.delete(k) : t.picked.size < t.p.n && t.picked.add(k); render();
 }
 // เลือกการ์ดในมือที่จะทิ้งเป็นค่าใช้สกิล
 function pickDiscard(ab) {
@@ -1716,6 +1826,9 @@ setTimeout(() => showDeckHero(), 0);
 // ระดับบอท
 const LVDESC = { easy: "บอทเล่นพลาดบ้าง ไม่ใช้เวทสวน ไม่รุมตี — เหมาะกับคนเพิ่งเล่น", normal: "บอทมาตรฐาน",
   hard: "บอทเลือกคู่ตีฉลาดขึ้น ใช้เวทสวนเฉพาะที่ได้ผล และจั่วเพิ่ม 1 ใบทุก 2 เทิร์นของมัน" };
+function showTurnSec() { for (const b of document.querySelectorAll("#turnsec button")) b.classList.toggle("on", +b.dataset.v === SET.turnSec); }
+for (const b of document.querySelectorAll("#turnsec button")) b.onclick = () => { SET.turnSec = +b.dataset.v; saveSet(); showTurnSec(); SFX.play("click"); };
+showTurnSec();
 function showLv() { for (const b of document.querySelectorAll("#botlv button")) b.classList.toggle("on", b.dataset.v === SET.botLevel); $("botlvdesc").textContent = LVDESC[SET.botLevel] || ""; }
 for (const b of document.querySelectorAll("#botlv button")) b.onclick = () => { SET.botLevel = b.dataset.v; saveSet(); showLv(); SFX.play("click"); };
 showLv();
@@ -1904,6 +2017,7 @@ function resetForNewGame() {
   NET.logs = []; NET.askP = null;
   overShown = false; V = null; queue.length = 0; mode = "idle"; sel = null; fodder = new Set(); $("log").innerHTML = ""; $("hist").innerHTML = "";
   for (const m of document.querySelectorAll(".modal")) m.remove();
+  targetAsk = null; ownAsk = null;
   rematch.me = rematch.guest = null;
 }
 function rematchStatus() {
@@ -1914,7 +2028,7 @@ function tryRematch() {
   if (role !== "host" || !rematch.me || !rematch.guest) return;
   const decks = [rematch.me, rematch.guest];
   conn.send({ type: "newgame" }); for (const w of NET.watchers) if (w.open) w.send({ type: "newgame" }); resetForNewGame();
-  newSession(["local", "remote"], [myName(), guestName], decks);
+  newSession(["local", "remote"], [myName(), guestName], decks, { turnSec: SET.turnSec });
 }
 
 // ---------- ต่อห้องใหม่เมื่อหลุด
@@ -2001,7 +2115,7 @@ function hostData(c, d) {
     conn = c; NET.token = String(d.token || ""); heartbeat(c);
     guestName = String(d.name || "ผู้เล่น 2").slice(0, 16); if (guestName === myName()) guestName += " (2)";
     NET.oppPid = typeof d.pid === "string" ? d.pid.slice(0, 16) : null; c.send({ type: "meet", pid: MYPID });   // รหัสผู้เล่นถาวร (สถิติกับเพื่อน)
-    newSession(["local", "remote"], [myName(), guestName], [deckSpec($("mydeck").value), deck]);
+    newSession(["local", "remote"], [myName(), guestName], [deckSpec($("mydeck").value), deck], { turnSec: SET.turnSec });
     return;
   }
   if (c !== conn) return;

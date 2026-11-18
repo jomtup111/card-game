@@ -253,7 +253,7 @@
     actions(x) {
       const whole = this.own(x); if (whole) return [whole];
       let w;
-      if ((w = x.match(/^ดูมือศัตรู แล้วเลือกการ์ด (\d+) ใบให้ศัตรูทิ้ง$/))) return [["edisc", +w[1]]];
+      if ((w = x.match(/^ดูมือศัตรู แล้วเลือกการ์ด (\d+) ใบให้ศัตรูทิ้ง$/))) return [["edisc", +w[1], "look"]];
       if (/^สังเวย 1 ตัว แล้วทำลายมอนสเตอร์ศัตรู 1 ตัวที่ power ≤ power ของตัวที่สังเวย$/.test(x)) return [["sackill"]];
       if ((w = x.match(/^ค้น(\S+?) 1 ใบ และ(\S+?) cost ≤ (\d+) อีก 1 ใบ จากเดคขึ้นมือ$/))) return [["search", w[1], null, null], ["search", w[2], "≤", +w[3]]];
       if ((w = x.match(/^ทั้งสองฝ่ายทิ้งการ์ดจากมือคนละ (\d+) ใบ$/))) return [["discard", +w[1]], ["edisc", +w[1]]];
@@ -298,7 +298,7 @@
         if ((m = part.match(/^ถ้ามี(\S+?)ตัวอื่นฝั่งเรา power \+(\d+) ถาวร$/))) { out.push(["selfif", m[1], +m[2]]); continue; }
         if ((m = part.match(/^เนรเทศการ์ด(?: (\d+) ใบจาก|ทุกใบใน)สุสานศัตรู$/))) { out.push(["exilegrave", m[1] ? +m[1] : 99]); continue; }
         if (/^เทิร์นนี้ศัตรูใช้เวทสวนไม่ได้$/.test(part)) { out.push(["silence"]); continue; }
-        if ((m = part.match(/^ดูมือศัตรู แล้วเลือกการ์ด (\d+) ใบให้ศัตรูทิ้ง$/))) { out.push(["edisc", +m[1]]); continue; }
+        if ((m = part.match(/^ดูมือศัตรู แล้วเลือกการ์ด (\d+) ใบให้ศัตรูทิ้ง$/))) { out.push(["edisc", +m[1], "look"]); continue; }
         if ((m = part.match(/^สังเวยมอนสเตอร์ฝั่งเรา 1 ตัวเพื่อจั่ว (\d+) ใบได้/))) { out.push(["sacdraw", +m[1]]); return out; }
         if (/^นำการ์ดเวท 1 ใบจากกองสุสานกลับขึ้นมือ$/.test(part)) { out.push(["raisespell"]); continue; }
         if (/^ใช้เวทปกติจากกองสุสานได้ 1 ใบ/.test(part)) { out.push(["castgrave"]); return out; }
@@ -389,9 +389,12 @@
     constructor(deckA, deckB, seed = Date.now(), log = () => {}, opt = {}) {
       this.opt = Object.assign({ gang: 2 }, opt);   // ตีรวม (2026-11-17): รุมตีได้ เป้าฆ่ากลับ 1 ตัว · ทดลองปิดด้วย { gang: 0 }
       this.rnd = rngOf(seed); this.log = log;
+      UID = 0;                                           // uid นับใหม่ทุกเกม → รหัสเล่นซ้ำ (รายงานบัค) ใช้ได้แม้เป็นเกมที่ 2+ ในหน้าเดียวกัน
       this.P = [new Player("คุณ", deckA, this.rnd), new Player("บอท", deckB, this.rnd)];
       this.P.forEach((p, i) => (p.onDraw = (n) => this.emit({ t: "draw", by: i, n })));   // เหตุการณ์ให้หน้าจอ: จั่ว
       this.turn = 0; this.deaths = 0; this.cur = 0; this.winner = null; this.onFx = null;
+      // ผู้เล่นคนเลือกการ์ดที่จะทิ้งเอง (Session ตั้ง picker/flushFn ให้ · ไม่ตั้ง = เลือกอัตโนมัติ เหมือนเดิมทุกอย่าง เช่นตัวจำลอง)
+      this.picker = null; this.flushFn = null; this.pending = [];
       for (const p of this.P) p.draw(opt.hand0 || HAND0);
     }
     emit(e) { if (this.onFx) this.onFx(e); }
@@ -479,8 +482,8 @@
       if (owner.immune) { this.log(`${u.name} ไม่ตาย (คุ้มครอง)`); return; }
       if (u.save) { u.save = false; this.log(`${u.name} รอดจากความตาย`); return; }
       if (u.kinds.has("เครื่องจักร") && owner.hand.length && owner.mechSaveTurn !== this.turn && owner.field.some((o) => o !== u && o.h.mechSave)) {
-        owner.mechSaveTurn = this.turn; const c = [...owner.hand].sort((x, y) => value(x) - value(y))[0]; this.discard(owner, c);
-        this.log(`${u.name} รอด (ทิ้ง ${c.name})`); return;
+        owner.mechSaveTurn = this.turn; this.log(`${u.name} รอด (ทิ้งการ์ดแทน)`);
+        this.pickDiscard({ chooser: owner, victim: owner, n: 1, why: `${u.name} รอด: เลือกการ์ด 1 ใบที่จะทิ้งแทน`, after: (cs) => this.discardMany(owner, cs, "ทิ้ง") }); return;
       }
       if (u.kw["โล่แสง"] && u.shieldKeep) { u.shieldKeep = false; this.log(`${u.name} โล่แสงไม่แตก`); return; }
       if (u.kw["โล่แสง"]) {
@@ -536,11 +539,14 @@
       this.refresh();
     }
     addToken(p, name, n = 1) { for (let i = 0; i < n; i++) { if (p.field.length >= FIELD) return; p.field.push(new Unit(null, name)); } }
-    pick(e, n = 1, maxp = null, kind = null, by = "power", limit = 99) {
+    // เป้าที่เลือกได้ทั้งหมด (กติกาเดียวกับ pick: ชนิด · power สูงสุด · ล่อเป้าเวท · cost) — pick = เรียงตัวแรงสุดแล้วตัด n ตัว
+    pick(e, n = 1, maxp = null, kind = null, by = "power", limit = 99) { return this.byPow(e, this.cands(e, n, maxp, kind, by, limit)).slice(0, n); }
+    byPow(e, us) { return [...us].sort((a, b) => this.eff(e, b) - this.eff(e, a)); }
+    cands(e, n = 1, maxp = null, kind = null, by = "power", limit = 99) {
       let c = e.field.filter((u) => (!kind || kindMatch(u.kinds, kind)) && (maxp == null || this.eff(e, u) <= maxp));
       if (this.magnetFor === e && n < 5 && e.field.some((u) => u.h.magnet)) c = c.filter((u) => u.h.magnet);   // เวทของศัตรูเลือกได้แค่ตัวล่อเป้า
       if (by === "cost") c = c.filter((u) => (u.card ? u.card.cost : 0) <= limit); else if (limit !== 99) c = c.filter((u) => this.eff(e, u) <= limit);
-      return c.sort((a, b) => this.eff(e, b) - this.eff(e, a)).slice(0, n);
+      return c;
     }
     place(p, c, deferEnter = false) {
       const u = new Unit(c); p.field.push(u); this.lastPlaced = u; this.refresh();
@@ -556,62 +562,132 @@
       for (const o of p.field) if (o.h.onDiscardPow) o.temp += o.h.onDiscardPow;
     }
 
+    // ---------- เลือกการ์ดที่จะทิ้ง
+    // อัตโนมัติ: ทิ้งใบที่ค่าน้อยสุดของตัวเอง · ยกเว้น "ดูมือศัตรู แล้วเลือก" (look) = คนร่ายเลือกใบดีสุดของศัตรู
+    autoDiscard(victim, n, cands, look = false) { return [...cands].sort((x, y) => (look ? value(y) - value(x) : value(x) - value(y))).slice(0, n); }
+    // ---------- ผู้เล่นคนเลือกเอง (เป้าของสกิล / การ์ดที่ทิ้ง / การ์ดจากเดค-สุสาน)
+    // pd: { kind: "discard"|"unit"|"card", chooser, n, optional, why, cands, auto(need, cands) → [..], valid(x), after([..]) }
+    //   chooser เป็นคน (picker) และเลือกได้จริง → พักไว้ใน pending (Session ถามแล้วเรียก after) · ไม่ต้องเลือก/บอท → auto ทันที (เหมือนเดิมทุกอย่าง)
+    choose(pd) {
+      if (pd.kind === "discard") {
+        pd.cands = pd.cands || [...pd.victim.hand];
+        pd.valid = pd.valid || ((c) => pd.victim.hand.includes(c));
+        pd.auto = pd.auto || ((need, cs) => (pd.optional ? this.autoDiscard(pd.victim, need, cs).filter((c) => value(c) < 1) : this.autoDiscard(pd.victim, need, cs, pd.look)));
+      }
+      const need = Math.min(pd.n, pd.cands.length);
+      if (this.picker && this.picker(pd.chooser) && need > 0 && (pd.optional || pd.gem || need < pd.cands.length)) { this.pending.push(pd); return true; }
+      pd.after(pd.auto(need, pd.cands)); return false;
+    }
+    pickDiscard(pd) { pd.kind = "discard"; return this.choose(pd); }
+    // เลือกเป้ามอนสเตอร์ศัตรู/ของเรา: us = ตัวที่เลือกได้ · auto = ตัว power สูงสุด (เหมือน pick)
+    chooseUnits(p, side, us, n, why, fx, extra = {}) {
+      return this.choose({ kind: "unit", chooser: p, side, cands: us, n, why, auto: (need, cs) => this.byPow(side, cs).slice(0, need), valid: (u) => side.field.includes(u),
+        after: (sel) => { for (const u of sel) if (side.field.includes(u)) fx(u); }, ...extra });
+    }
+    // คำตอบจากผู้เล่น (ตำแหน่งใน pd.cands) → ตัวที่เลือก · ไม่ถูกต้อง/เป้าหายไปแล้ว = เลือกอัตโนมัติ
+    answerPick(pd, k) {
+      const live = pd.cands.filter((x) => pd.valid(x)), need = Math.min(pd.n, live.length);
+      const idx = Array.isArray(k) ? [...new Set(k)] : [];
+      if (pd.gem) {                                                       // จ่าย gem: รวม gem ของที่เลือก ≥ ที่ต้องจ่าย
+        const sel = idx.every((i) => Number.isInteger(i) && pd.cands[i] && live.includes(pd.cands[i])) ? idx.map((i) => pd.cands[i]) : [];
+        return sel.length && sel.reduce((s, c) => s + this.gemOf(pd.chooser, c), 0) >= pd.gem ? sel : pd.auto(need, live);
+      }
+      const ok = idx.every((i) => Number.isInteger(i) && pd.cands[i] && live.includes(pd.cands[i])) && (idx.length === need || (pd.optional && idx.length === 0));
+      if (ok) return idx.map((i) => pd.cands[i]);
+      return pd.optional ? [] : pd.auto(need, live);
+    }
+    discardMany(victim, cs, why = "") { for (const c of cs) if (victim.hand.includes(c)) this.discard(victim, c); if (cs.length && why) this.log(`   ${victim.name} ${why} ${cs.map((c) => c.name).join(", ")}`); }
+    async flush() { if (this.flushFn && this.pending.length) await this.flushFn(); }
+
     run(p, acts, src = null, self = null) {
       const e = this.other(p), spell = src && src.type !== "มอน";
       if (src && src.id && acts && acts.length && (self || spell)) this.emit({ t: "skill", id: src.id, by: this.P.indexOf(p), uid: self ? self.uid : null });   // หน้าจอ: ป้ายชื่อสกิล + เส้นแสงไปเป้า
       const prevMag = this.magnetFor; if (spell) this.magnetFor = e;
       try { this.runActs(p, e, acts, src, self, spell); } finally { this.magnetFor = prevMag; this.refresh(); }
     }
+    // ทำสกิลที่เหลือหลังผู้เล่นเลือกการ์ดที่ทิ้งเสร็จ (พักไว้ตอนต้องรอเลือก)
+    runRest(p, e, acts, src, self, spell) {
+      if (!acts.length) return;
+      const prevMag = this.magnetFor; if (spell) this.magnetFor = e;
+      try { this.runActs(p, e, acts, src, self, spell); } finally { this.magnetFor = prevMag; this.refresh(); }
+    }
+    // คืนค่า true = หยุดรอผู้เล่นเลือกการ์ดที่จะทิ้ง (สกิลที่เหลือจะทำต่อใน after)
     runActs(p, e, acts, src, self, spell) {
-      for (const a of acts) {
+      for (let ai = 0; ai < acts.length; ai++) {
+        const a = acts[ai], rest = () => this.runRest(p, e, acts.slice(ai + 1), src, self, spell);
+        // ถามผู้เล่น: ต้องรอ (หรือผลที่ทำทันทีไปสร้างคำถามต่อ เช่น สังเวยแล้วเลือกเป้า) → สกิลที่เหลือไปทำต่อหลังคำถามสุดท้าย
+        const wait = (deferred, n0) => { if (!deferred && this.pending.length === n0) return false; this.pending[this.pending.length - 1].rest = rest; return true; };
+        const ask = (pd) => { pd.src = src; pd.self = pd.self || self; pd.kind = pd.kind || "discard"; const n0 = this.pending.length; return wait(this.choose(pd), n0); };
+        const aim = (us, n, why, fx, extra) => { const n0 = this.pending.length; return wait(this.chooseUnits(p, e, us, n, why, fx, { src, self, ...extra }), n0); };
+        // เลือกการ์ดจากโซน (เดค/สุสาน/มือ): cs = ตัวเลือก · auto = ลำดับเดิม (บอท) · zone = ต้องยังอยู่ในโซนนั้นตอนตอบ
+        const cards = (cs, n, why, auto, zone, fx, extra = {}) => ask({ kind: "card", chooser: p, cands: cs, n, why, auto: (need, l) => auto(l).slice(0, need), valid: (c) => zone().includes(c), after: (sel) => { for (const c of sel) if (zone().includes(c)) fx(c); }, ...extra });
+        const mine = (us, n, why, fx, extra) => { const n0 = this.pending.length; return wait(this.chooseUnits(p, p, us, n, why, fx, { src, self, ...extra }), n0); };
+        const hitFx = (u) => { if (!spell) this.emit({ t: "hit", uid: u.uid }); this.kill(e, u, spell); };
         if (p.lost || e.lost) return;
         const k = a[0];
         if (k === "draw") { if (a[2] && !this.count(p, a[2])) continue; this.extraDraw(p, a[1]); }
         else if (k === "drawto") this.extraDraw(p, Math.max(0, a[1] - p.hand.length));
         else if (k === "noop") {}
-        else if (k === "killbig") { const t = e.field.filter((u) => this.eff(e, u) >= a[1]).sort((x, y) => this.eff(e, y) - this.eff(e, x))[0]; if (t) this.kill(e, t, spell); }
+        else if (k === "killbig") { if (aim(e.field.filter((u) => this.eff(e, u) >= a[1]), 1, `เลือกมอนสเตอร์ศัตรูที่ power ≥ ${a[1]} เพื่อทำลาย`, hitFx)) return true; }
         else if (k === "volley") { for (const u of [...p.field]) if (u.shoot != null && p.field.includes(u)) this.shootWith(p, u, a[1]); }
-        else if (k === "killtok") { const t = e.field.filter((u) => !u.card || u.kinds.has("ไข่")).sort((x, y) => this.eff(e, y) - this.eff(e, x))[0]; if (t) this.kill(e, t, spell); }
-        else if (k === "loot") { const c = [...p.hand].sort((x, y) => value(x) - value(y))[0]; if (c && value(c) < 1) { this.discard(p, c); this.extraDraw(p, 1); } }
+        else if (k === "killtok") { if (aim(e.field.filter((u) => !u.card || u.kinds.has("ไข่")), 1, "เลือกโทเคน/ไข่ของศัตรูเพื่อทำลาย", hitFx)) return true; }
+        else if (k === "loot") { if (ask({ chooser: p, victim: p, n: 1, optional: true, why: "ทิ้ง 1 ใบเพื่อจั่ว 1 ใบ (ไม่ทิ้งก็ได้)", after: (cs) => { this.discardMany(p, cs, "ทิ้ง"); if (cs.length) this.extraDraw(p, 1); } })) return true; }
         else if (k === "drawif") { if (this.count(p, a[1]) >= a[2]) this.extraDraw(p, a[3]); }
         else if (k === "scry") { const d = a[1] === "enemy" ? e.deck : p.deck, top = d[d.length - 1]; if (top && (a[1] === "enemy" ? value(top) >= 1.5 : value(top) < 0.5)) d.unshift(d.pop()); }
         else if (k === "selfif") { if (self && this.count(p, a[1], "field", self) > 0) self.power += a[2]; }
         else if (k === "selfelem") { if (self && this.elem(p) >= a[1]) self.power += a[2]; }
-        else if (k === "exilegrave") { const g = [...e.grave].sort((x, y) => value(y) - value(x)).slice(0, a[1]); e.grave = e.grave.filter((c) => !g.includes(c)); if (g.length) this.log(`   เนรเทศ ${g.length} ใบจากสุสาน ${e.name}`); }
+        else if (k === "exilegrave") { if (cards(e.grave, a[1], `เลือกการ์ด ${a[1]} ใบในสุสาน${e.name}เพื่อเนรเทศ`, (l) => [...l].sort((x, y) => value(y) - value(x)), () => e.grave, (c) => { e.grave.splice(e.grave.indexOf(c), 1); this.log(`   เนรเทศ ${c.name} จากสุสาน ${e.name}`); })) return true; }
         else if (k === "silence") { e.silencedTurn = this.turn; this.log(`   เทิร์นนี้ ${e.name} ใช้เวทสวนไม่ได้`); }
         else if (k === "sacdraw" || k === "sackill") {
-          const v = p.field.filter((u) => u !== self).sort((x, y) => (!!x.card - !!y.card) || this.eff(p, x) - this.eff(p, y))[0];
-          if (!v || (k === "sacdraw" && v.card && this.eff(p, v) > 2)) continue;
-          if (k === "sackill" && !this.pick(e, 1, this.eff(p, v)).length) continue;
-          const pw = this.eff(p, v); this.log(`   สังเวย ${v.name}`); this.kill(p, v); this.sacrificed(p);
-          if (k === "sacdraw") this.extraDraw(p, a[1]); else for (const t of this.pick(e, 1, pw)) this.kill(e, t);
+          const own = p.field.filter((u) => u !== self);
+          const autoV = () => { const v = [...own].sort((x, y) => (!!x.card - !!y.card) || this.eff(p, x) - this.eff(p, y))[0];   // บอท: สังเวยตัวอ่อนสุด (โทเคนก่อน) เฉพาะตอนคุ้ม
+            if (!v || (k === "sacdraw" && v.card && this.eff(p, v) > 2) || (k === "sackill" && !this.pick(e, 1, this.eff(p, v)).length)) return []; return [v]; };
+          const sac = (v) => {
+            const pw = this.eff(p, v); this.log(`   สังเวย ${v.name}`); this.kill(p, v); this.sacrificed(p);
+            if (k === "sacdraw") this.extraDraw(p, a[1]);
+            else this.chooseUnits(p, e, this.cands(e, 1, pw), 1, `เลือกมอนสเตอร์ศัตรูที่ power ≤ ${pw} เพื่อทำลาย`, (t) => { this.emit({ t: "hit", uid: t.uid }); this.kill(e, t); }, { src, self });
+          };
+          if (!own.length) continue;
+          if (ask({ kind: "unit", chooser: p, side: p, cands: own, n: 1, optional: k === "sacdraw", why: k === "sacdraw" ? `สังเวยมอนสเตอร์ของเรา 1 ตัวเพื่อจั่ว ${a[1]} ใบ (ไม่ทำก็ได้)` : "เลือกมอนสเตอร์ของเราที่จะสังเวย",
+            auto: () => autoV(), valid: (u) => p.field.includes(u), after: (sel) => { for (const v of sel) if (p.field.includes(v)) sac(v); } })) return true;
         }
-        else if (k === "raisespell") { if (this.raiseBlocked(p)) continue; const c = p.grave.filter((c) => c.type !== "มอน").sort((x, y) => value(y) - value(x))[0]; if (c) { p.grave.splice(p.grave.indexOf(c), 1); p.hand.push(c); } }
-        else if (k === "castgrave") { const c = p.grave.filter((c) => c.type === "เวทปกติ" && c.spell.length && !c.spell.some((x) => x[0] === "castgrave") && (!c.spellCond || this.count(p, c.spellCond))).sort((x, y) => value(y) - value(x))[0]; if (c) { this.log(`   ใช้ ${c.name} จากสุสาน`); this.run(p, c.spell, c); } }
-        else if (k === "killcount") { for (const t of this.pick(e, 1, this.count(p, a[1]))) this.kill(e, t, spell); }
-        else if (k === "bounceelem") { for (const t of this.pick(e, 1, this.elem(p) + a[1])) { this.removeTo(e, t, "hand"); this.log(`${t.name} ถูกส่งกลับมือ`); } }
+        else if (k === "raisespell") { if (this.raiseBlocked(p)) continue; if (cards(p.grave.filter((c) => c.type !== "มอน"), 1, "เลือกเวท 1 ใบจากสุสานขึ้นมือ", (l) => [...l].sort((x, y) => value(y) - value(x)), () => p.grave, (c) => { p.grave.splice(p.grave.indexOf(c), 1); p.hand.push(c); })) return true; }
+        else if (k === "castgrave") { if (cards(p.grave.filter((c) => c.type === "เวทปกติ" && c.spell.length && !c.spell.some((x) => x[0] === "castgrave") && (!c.spellCond || this.count(p, c.spellCond))), 1, "เลือกเวทปกติในสุสานที่จะใช้", (l) => [...l].sort((x, y) => value(y) - value(x)), () => p.grave, (c) => { this.log(`   ใช้ ${c.name} จากสุสาน`); this.run(p, c.spell, c); })) return true; }
+        else if (k === "killcount") { const n = this.count(p, a[1]); if (aim(this.cands(e, 1, n), 1, `เลือกมอนสเตอร์ศัตรูที่ power ≤ ${n} เพื่อทำลาย`, hitFx)) return true; }
+        else if (k === "bounceelem") { const n = this.elem(p) + a[1]; if (aim(this.cands(e, 1, n), 1, `เลือกมอนสเตอร์ศัตรูที่ power ≤ ${n} ส่งกลับมือ`, (t) => { this.emit({ t: "hit", uid: t.uid }); this.removeTo(e, t, "hand"); this.log(`${t.name} ถูกส่งกลับมือ`); })) return true; }
         else if (k === "gearmerge") {
           const gs = p.field.filter((u) => u.name === "เฟือง"); if (gs.length < 2) continue;
           for (const g of gs) p.field.splice(p.field.indexOf(g), 1);
           const t = new Unit(null, "เฟือง"); t.name = "หุ่นเฟือง"; t.power = 2 * gs.length; p.field.push(t); this.log(`🤖 รวมเฟือง ${gs.length} ตัวเป็นหุ่น power ${t.power}`);
         }
         else if (k === "pullup") { if (self) for (const o of p.field) if (o !== self && o.attached.length) { for (const c of o.attached) { o.power -= c.base; self.power += c.base; for (const g of c.grant) self.kw[g] = true; if (c.h.upScale) self.upScale = true; } self.attached.push(...o.attached); o.attached = []; } }
-        else if (k === "refund") { const c = (p.lastFodder || []).filter((c) => p.grave.includes(c)).sort((x, y) => value(y) - value(x))[0]; if (c) { p.grave.splice(p.grave.indexOf(c), 1); p.hand.push(c); this.log(`   ${c.name} กลับขึ้นมือ`); } }
+        else if (k === "refund") { if (cards((p.lastFodder || []).filter((c) => p.grave.includes(c)), 1, "เลือกการ์ดที่ทิ้งเป็นค่าอัญเชิญ 1 ใบกลับขึ้นมือ", (l) => [...l].sort((x, y) => value(y) - value(x)), () => p.grave, (c) => { p.grave.splice(p.grave.indexOf(c), 1); p.hand.push(c); this.log(`   ${c.name} กลับขึ้นมือ`); })) return true; }
         else if (k === "lastatk") { if (this.lastPlaced && p.field.includes(this.lastPlaced)) this.lastPlaced.attacksLeft = Math.max(this.lastPlaced.attacksLeft, a[1]); }
-        else if (k === "discard") { for (const c of [...p.hand].sort((x, y) => value(x) - value(y)).slice(0, a[1])) this.discard(p, c); }
+        else if (k === "discard") { if (ask({ chooser: p, victim: p, n: a[1], why: `ทิ้งการ์ด ${a[1]} ใบ`, after: (cs) => this.discardMany(p, cs, "ทิ้ง") })) return true; }
         else if (k === "token") { if (a[3] && !this.count(p, a[3])) continue; this.addToken(p, a[1], a[2]); }
-        else if (k === "kill") { let [, n, lim, kind] = a; if (n === "elem") n = this.elem(p); if (!n) continue; const maxp = lim === "ค่าผสานธาตุ" ? this.elem(p) : lim ? +lim : null; for (const u of this.pick(e, n, maxp, kind)) { if (!spell) this.emit({ t: "hit", uid: u.uid }); this.kill(e, u, spell); } }
-        else if (k === "bounce" || k === "bottom") { for (const u of this.pick(e, a[1], null, null, a[2], a[3])) { this.emit({ t: "hit", uid: u.uid }); this.removeTo(e, u, k === "bounce" ? "hand" : "deck"); this.log(`${u.name} ถูกส่ง${k === "bounce" ? "กลับมือ" : "ไปใต้เดค"}`); } }
-        else if (k === "curse") { for (const u of this.pick(e, a[1])) { this.emit({ t: "pow", uid: u.uid, n: -a[2] }); if (a[3]) u.power -= a[2]; else u.temp -= a[2]; if (this.eff(e, u) < 0) this.kill(e, u); } }
-        else if (k === "freeze") { for (const u of this.pick(e, a[1], a[2])) { u.frozen = true; this.emit({ t: "freeze", uid: u.uid }); } }
-        else if (k === "steal") { if (p.field.length >= FIELD) continue; const t = this.pick(e, 1, a[1]); if (t.length) { const u = t[0]; this.emit({ t: "hit", uid: u.uid }); e.field.splice(e.field.indexOf(u), 1); u.stolenFrom = e; u.attacksLeft = 1; p.field.push(u); this.log(`💘 ${p.name} ยึด ${u.name}`); } }
-        else if (k === "buff") { const [, word, n, perm, every] = a; let tg = p.field.filter((u) => kindMatch(u.kinds, word) || ["มอนสเตอร์", ""].includes(normKind(word))); if (!every) tg = tg.sort((x, y) => this.eff(p, y) - this.eff(p, x)).slice(0, 1); for (const u of tg) { if (perm) u.power += n; else u.temp += n; } }
-        else if (k === "search") { const [, word, op, lim] = a; for (let i = p.deck.length - 1; i >= 0; i--) { const c = p.deck[i]; if (kindMatch(c.kinds, word) && (lim == null || (op === "≤" ? c.cost <= lim : c.cost >= lim))) { p.deck.splice(i, 1); p.hand.push(c); break; } } }
-        else if (k === "raise") { if (this.raiseBlocked(p)) continue; const [, word, lim, toField, n] = a; for (let i = 0; i < n; i++) { const cand = p.grave.filter((c) => kindMatch(c.kinds, word) && c.cost <= lim && !c.kw["หลับใหล"]); if (!cand.length) break; const c = cand.sort((x, y) => y.base - x.base)[0]; p.grave.splice(p.grave.indexOf(c), 1); if (toField && c.type === "มอน" && p.field.length < FIELD) this.place(p, c); else p.hand.push(c); } }
-        else if (k === "entomb") { for (const z of [p.deck, p.hand]) { const cand = z.filter((c) => kindMatch(c.kinds, a[1])).sort((x, y) => !!y.kw["หลับใหล"] - !!x.kw["หลับใหล"]); if (cand.length) { z.splice(z.indexOf(cand[0]), 1); p.grave.push(cand[0]); break; } } }
+        else if (k === "kill") { let [, n, lim, kind] = a; if (n === "elem") n = this.elem(p); if (!n) continue; const maxp = lim === "ค่าผสานธาตุ" ? this.elem(p) : lim ? +lim : null; if (aim(this.cands(e, n, maxp, kind), n, `เลือกมอนสเตอร์ศัตรู${kind ? ` (${kind})` : ""} ${n} ตัว${maxp != null ? ` ที่ power ≤ ${maxp}` : ""} เพื่อทำลาย`, hitFx)) return true; }
+        else if (k === "bounce" || k === "bottom") { const where = k === "bounce" ? "กลับมือ" : "ไปใต้เดค"; if (aim(this.cands(e, a[1], null, null, a[2], a[3]), a[1], `เลือกมอนสเตอร์ศัตรู ${a[1]} ตัว ส่ง${where}`, (u) => { this.emit({ t: "hit", uid: u.uid }); this.removeTo(e, u, k === "bounce" ? "hand" : "deck"); this.log(`${u.name} ถูกส่ง${where}`); })) return true; }
+        else if (k === "curse") { if (aim(this.cands(e, a[1]), a[1], `เลือกมอนสเตอร์ศัตรู ${a[1]} ตัว power −${a[2]}${a[3] ? " ถาวร" : ""}`, (u) => { this.emit({ t: "pow", uid: u.uid, n: -a[2] }); if (a[3]) u.power -= a[2]; else u.temp -= a[2]; if (this.eff(e, u) < 0) this.kill(e, u); })) return true; }
+        else if (k === "freeze") { if (aim(this.cands(e, a[1], a[2]), a[1], `เลือกมอนสเตอร์ศัตรู ${a[1]} ตัวเพื่อแช่แข็ง`, (u) => { u.frozen = true; this.emit({ t: "freeze", uid: u.uid }); })) return true; }
+        else if (k === "steal") { if (p.field.length >= FIELD) continue; if (aim(this.cands(e, 1, a[1]), 1, `เลือกมอนสเตอร์ศัตรูที่จะยึด${a[1] != null ? ` (power ≤ ${a[1]})` : ""}`, (u) => { if (p.field.length >= FIELD) return; this.emit({ t: "hit", uid: u.uid }); e.field.splice(e.field.indexOf(u), 1); u.stolenFrom = e; u.attacksLeft = 1; p.field.push(u); this.log(`💘 ${p.name} ยึด ${u.name}`); })) return true; }
+        else if (k === "buff") { const [, word, n, perm, every] = a; let tg = p.field.filter((u) => kindMatch(u.kinds, word) || ["มอนสเตอร์", ""].includes(normKind(word))); const fx = (u) => { if (perm) u.power += n; else u.temp += n; this.emit({ t: "pow", uid: u.uid, n }); }; if (every) tg.forEach(fx); else if (mine(tg, 1, `เลือกมอนสเตอร์ของเรา power +${n}${perm ? " ถาวร" : ""}`, fx)) return true; }
+        else if (k === "search") { const [, word, op, lim] = a; const cs = [...new Set(p.deck.filter((c) => kindMatch(c.kinds, word) && (lim == null || (op === "≤" ? c.cost <= lim : c.cost >= lim))))].reverse();   // บนสุดก่อน · การ์ดซ้ำแสดงใบเดียว
+          if (cards(cs, 1, `ค้นหาการ์ด${word} 1 ใบจากเดคขึ้นมือ`, (l) => l, () => p.deck, (c) => { p.deck.splice(p.deck.lastIndexOf(c), 1); p.hand.push(c); })) return true; }
+        else if (k === "raise") { if (this.raiseBlocked(p)) continue; const [, word, lim, toField, n] = a; const ok = (c) => kindMatch(c.kinds, word) && c.cost <= lim && !c.kw["หลับใหล"];
+          const one = (c) => { p.grave.splice(p.grave.indexOf(c), 1); if (toField && c.type === "มอน" && p.field.length < FIELD) this.place(p, c); else p.hand.push(c); };
+          if (!this.picker || !this.picker(p)) { for (let i = 0; i < n; i++) { const cand = p.grave.filter(ok); if (!cand.length) break; one(cand.sort((x, y) => y.base - x.base)[0]); } }   // บอท: เหมือนเดิม (เลือกใหม่ทีละใบ)
+          else if (cards(p.grave.filter(ok), n, `เลือก${word} ${n} ใบจากสุสาน${toField ? "อัญเชิญ" : "ขึ้นมือ"}`, (l) => [...l].sort((x, y) => y.base - x.base), () => p.grave, one)) return true; }
+        else if (k === "entomb") { const z = p.deck.some((c) => kindMatch(c.kinds, a[1])) ? p.deck : p.hand;
+          if (cards([...new Set(z.filter((c) => kindMatch(c.kinds, a[1])))], 1, `เลือก${a[1]} 1 ใบจาก${z === p.deck ? "เดค" : "มือ"}ลงสุสาน`, (l) => [...l].sort((x, y) => !!y.kw["หลับใหล"] - !!x.kw["หลับใหล"]), () => z, (c) => { z.splice(z.indexOf(c), 1); p.grave.push(c); })) return true; }
         else if (k === "mill") { for (let i = 0; i < a[1]; i++) if (p.deck.length) p.grave.push(p.deck.pop()); }
-        else if (k === "cheat") { const [, word, lim, zone] = a; for (const z of zone === "มือ" ? [p.hand, p.deck] : [p.deck]) { const cand = z.filter((c) => c.type === "มอน" && kindMatch(c.kinds, word) && c.cost <= lim && !c.kw["หลับใหล"]); if (cand.length && p.field.length < FIELD) { const c = cand.sort((x, y) => y.base - x.base)[0]; z.splice(z.indexOf(c), 1); this.place(p, c); break; } } }
-        else if (k === "edisc") { for (const c of [...e.hand].sort((x, y) => value(y) - value(x)).slice(0, a[1])) this.discard(e, c); }
+        else if (k === "cheat") { const [, word, lim, zone] = a; if (p.field.length >= FIELD) continue; const ok = (c) => c.type === "มอน" && kindMatch(c.kinds, word) && c.cost <= lim && !c.kw["หลับใหล"];
+          const zs = zone === "มือ" ? [p.hand, p.deck] : [p.deck], cs = [...new Set(zs.flatMap((z) => z.filter(ok)))], zOf = (c) => zs.find((z) => z.includes(c));
+          if (cards(cs, 1, `เลือก${word} 1 ตัว${zone === "มือ" ? "จากมือหรือเดค" : "จากเดค"}อัญเชิญฟรี`, () => { for (const z of zs) { const cand = z.filter(ok); if (cand.length) return [cand.sort((x, y) => y.base - x.base)[0]]; } return []; },
+            () => zs.flat(), (c) => { if (p.field.length >= FIELD) return; const z = zOf(c); z.splice(z.indexOf(c), 1); this.place(p, c); })) return true; }
+        else if (k === "edisc") {                                          // ศัตรูทิ้งจากมือ: ศัตรูเลือกเอง (2026-11-18) · "ดูมือศัตรู แล้วเลือก" = เราเลือก
+          const look = a[2] === "look";
+          if (ask({ chooser: look ? p : e, victim: e, n: a[1], look, why: look ? `เลือกการ์ดในมือ ${e.name} ${a[1]} ใบให้ทิ้ง` : `ต้องทิ้งการ์ดจากมือ ${a[1]} ใบ`, after: (cs) => this.discardMany(e, cs, "ทิ้ง") })) return true;
+        }
         else if (k === "titan") { if (a[1]) { const seen = new Set(p.field.map((u) => u.name)); for (const c of [...p.deck]) if (c.kinds.has("ชิ้นส่วนไททัน") && !seen.has(c.name) && p.field.length < FIELD) { p.deck.splice(p.deck.indexOf(c), 1); p.field.push(new Unit(c)); seen.add(c.name); } } this.titan(p); }
         else if (k === "hatchall") { for (const u of p.field) if (u.hatch) u.hatch[0] = 1; this.hatch(p); }
         else if (k === "awakenall") { for (const c of p.grave.filter((c) => c.kw["หลับใหล"]).slice(0, a[1])) if (p.field.length < FIELD && this.payAwaken(p, c)) { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); } }
@@ -619,8 +695,8 @@
           const [, word, n, fx] = a, all = ["มอนสเตอร์", ""].includes(normKind(word));
           let tg = p.field.filter((u) => all || kindMatch(u.kinds, word));
           if (fx.upg) tg = tg.filter((u) => u.attached.length);
-          if (n < 5) tg = tg.sort((x, y) => !this.canAttack(p, y) - !this.canAttack(p, x) || this.eff(p, y) - this.eff(p, x)).slice(0, n);
           const when = fx.long ? "start" : "end";
+          const apply = (tg) => {
           for (const u of tg) {
             const add = (v) => { if (fx.perm) u.power += v; else if (fx.long) u.temp2 += v; else u.temp += v; };
             if (fx.pw != null) { const v = fx.pw * (fx.per ? (fx.per === "มอนสเตอร์ตาย" || fx.per === "ตาย" ? this.deaths : this.count(p, fx.per)) : 1); add(v); if (v) this.emit({ t: "pow", uid: u.uid, n: v }); }
@@ -634,6 +710,11 @@
             if (fx.killBonus) u.killBonusTurn = this.turn;
           }
           if (tg.length) this.log(`   ${tg.map((u) => u.name).join(", ")} ได้รับผล`);
+          };
+          if (n >= 5) apply(tg);
+          else if (ask({ kind: "unit", chooser: p, side: p, cands: tg, n, why: `เลือกมอนสเตอร์ของเรา ${n} ตัวรับผล`, valid: (u) => p.field.includes(u),
+            auto: (need, cs) => [...cs].sort((x, y) => !this.canAttack(p, y) - !this.canAttack(p, x) || this.eff(p, y) - this.eff(p, x)).slice(0, need),
+            after: (sel) => apply(sel.filter((u) => p.field.includes(u))) })) return true;
         }
         else if (k === "wipe") {
           const [, maxp, exc, noKw, both] = a;
@@ -644,16 +725,18 @@
             this.kill(side, u, spell);
           }
         }
-        else if (k === "stealall") { for (const u of this.pick(e, a[2] || 5, a[1])) { if (p.field.length >= FIELD) break; e.field.splice(e.field.indexOf(u), 1); u.permFrom = e; p.field.push(u); this.log(`💘 ${p.name} ยึด ${u.name} ถาวร`); } }
-        else if (k === "sacown") { for (const u of [...p.field].sort((x, y) => this.eff(p, x) - this.eff(p, y)).slice(0, a[1])) { this.kill(p, u); this.sacrificed(p); } }
-        else if (k === "dronebomb") { const ds = p.field.filter((u) => u.kinds.has("โดรน")); const x = ds.length; for (const u of ds) this.kill(p, u); if (x) for (const u of this.pick(e, 1, 2 * x)) this.kill(e, u, true); }
+        else if (k === "stealall") { const n = a[2] || 5; if (aim(this.cands(e, n, a[1]), n, `เลือกมอนสเตอร์ศัตรู ${n} ตัวที่จะยึดถาวร`, (u) => { if (p.field.length >= FIELD) return; e.field.splice(e.field.indexOf(u), 1); u.permFrom = e; p.field.push(u); this.log(`💘 ${p.name} ยึด ${u.name} ถาวร`); })) return true; }
+        else if (k === "sacown") { if (mine(p.field, a[1], `เลือกมอนสเตอร์ของเรา ${a[1]} ตัวที่จะสังเวย`, (u) => { this.kill(p, u); this.sacrificed(p); }, { auto: (need, cs) => [...cs].sort((x, y) => this.eff(p, x) - this.eff(p, y)).slice(0, need) })) return true; }
+        else if (k === "dronebomb") { const ds = p.field.filter((u) => u.kinds.has("โดรน")); const x = ds.length; for (const u of ds) this.kill(p, u); if (x && aim(this.cands(e, 1, 2 * x), 1, `เลือกมอนสเตอร์ศัตรูที่ power ≤ ${2 * x} เพื่อทำลาย`, (u) => this.kill(e, u, true))) return true; }
         else if (k === "fight") {
           const w = p.field.filter((u) => kindMatch(u.kinds, a[1])).sort((x, y) => this.eff(p, y) - this.eff(p, x))[0]; if (!w) continue;
-          const t = e.field.filter((x) => this.eff(p, w, true, x) >= this.eff(e, x, false, w) + this.arm(x)).sort((x, y) => this.eff(e, y) - this.eff(e, x))[0] || e.field[0];
-          if (t) { this.log(`   ${w.name} สู้กับ ${t.name}`); this.combat(p, w, e, t, {}); }
+          const best = () => e.field.filter((x) => this.eff(p, w, true, x) >= this.eff(e, x, false, w) + this.arm(x)).sort((x, y) => this.eff(e, y) - this.eff(e, x))[0] || e.field[0];
+          if (aim(e.field, 1, `เลือกมอนสเตอร์ศัตรูให้ ${w.name} สู้ด้วย`, (t) => { if (!p.field.includes(w)) return; this.log(`   ${w.name} สู้กับ ${t.name}`); this.combat(p, w, e, t, {}); }, { auto: (need) => (need ? [best()] : []), self: w })) return true;
         }
-        else if (k === "curseper") { const n = a[1] * this.count(p, a[2]); for (const u of this.pick(e, 1)) { u.temp -= n; if (this.eff(e, u) < 0) this.kill(e, u); } }
-        else if (k === "look") { const top = p.deck.splice(Math.max(0, p.deck.length - a[1])); if (top.length) { const b = top.sort((x, y) => value(y) - value(x)).shift(); p.hand.push(b); p.deck.unshift(...top); } }
+        else if (k === "curseper") { const n = a[1] * this.count(p, a[2]); if (aim(this.cands(e, 1), 1, `เลือกมอนสเตอร์ศัตรู power −${n}`, (u) => { this.emit({ t: "pow", uid: u.uid, n: -n }); u.temp -= n; if (this.eff(e, u) < 0) this.kill(e, u); })) return true; }
+        else if (k === "look") { const top = p.deck.slice(Math.max(0, p.deck.length - a[1]));
+          const take = (sel) => { const keep = p.deck.slice(Math.max(0, p.deck.length - a[1])); p.deck.splice(Math.max(0, p.deck.length - a[1])); const b = sel.find((c) => keep.includes(c)) || keep.sort((x, y) => value(y) - value(x))[0]; if (!b) return; keep.splice(keep.indexOf(b), 1); p.hand.push(b); p.deck.unshift(...keep.sort((x, y) => value(y) - value(x))); };
+          if (top.length) { if (ask({ kind: "card", chooser: p, cands: top, n: 1, why: `ดูการ์ด ${a[1]} ใบบนสุดของเดค เลือก 1 ใบขึ้นมือ (ที่เหลือไปใต้เดค)`, auto: (need, l) => [...l].sort((x, y) => value(y) - value(x)).slice(0, need), valid: (c) => p.deck.includes(c), after: take, sub: "ใบที่เหลือไปอยู่ใต้เดค" })) return true; } }
         else if (k === "extraspell") p.spellMax++;
         else if (k === "nextred") p.nextRed.push([a[1], a[2]]);
         else if (k === "overnext") p.overNext += a[1];
@@ -663,8 +746,8 @@
         else if (k === "exileall") { for (const s of [p, e]) { for (const u of [...s.field]) if (kindMatch(u.kinds, a[1])) s.field.splice(s.field.indexOf(u), 1); s.grave = s.grave.filter((c) => !kindMatch(c.kinds, a[1])); } this.log(`   เนรเทศ${a[1]}ทั้งหมด`); }
         else if (k === "shootnow") { const u = p.field.find((u) => u.shoot != null); if (u) this.shootWith(p, u); }
         else if (k === "fossilreset") p.fossil = {};
-        else if (k === "freeupgrade") { const c = p.hand.find((c) => c.kw["อัปเกรด"]); if (c && p.field.some((u) => u.kinds.has("เครื่องจักร"))) { p.hand.splice(p.hand.indexOf(c), 1); this.attachUp(p, c); } }
-        else if (k === "combo") { if (p.played >= a[1]) this.runActs(p, e, a[2], src, self, spell); }
+        else if (k === "freeupgrade") { if (!p.field.some((u) => u.kinds.has("เครื่องจักร"))) continue; if (cards([...new Set(p.hand.filter((c) => c.kw["อัปเกรด"]))], 1, "เลือกการ์ดอัปเกรดในมือติดตั้งฟรี", (l) => l, () => p.hand, (c) => { p.hand.splice(p.hand.indexOf(c), 1); this.attachUp(p, c); })) return true; }
+        else if (k === "combo") { if (p.played >= a[1] && this.runActs(p, e, a[2], src, self, spell)) { const pd = this.pending[this.pending.length - 1], r0 = pd.rest; pd.rest = () => { if (r0) r0(); rest(); }; return true; } }
       }
     }
     checkOmega(p) {
@@ -706,7 +789,18 @@
         if (ok && p.field.length < FIELD && p.grave.includes(c) && this.payAwaken(p, c)) { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); this.log(`🐉 ${c.name} ตื่นจากสุสาน`); }
       }
     }
-    payAwaken(p, c) { const f = this.autoPay(p, c.awakenGem, null); if (f == null) return false; for (const x of f) this.discard(p, x); return true; }
+    payAwaken(p, c) {
+      const f = this.autoPay(p, c.awakenGem, null); if (f == null) return false;
+      if (!this.picker || !this.picker(p)) { for (const x of f) this.discard(p, x); return true; }
+      // คน: ปลุกเลย แล้วเลือกการ์ดจ่าย gem เอง (กันการ์ดชุดที่จะจ่ายไว้ ไม่ให้การปลุกตัวอื่นนับซ้ำ)
+      p.reserved = p.reserved || new Set(); for (const x of f) p.reserved.add(x);
+      const need = c.awakenGem, mineRes = new Set(f);
+      const free = (x) => p.hand.includes(x) && (!p.reserved.has(x) || mineRes.has(x));
+      this.choose({ kind: "card", chooser: p, gem: need, cands: p.hand.filter((x) => free(x) && this.gemOf(p, x) > 0), n: 1, why: `ปลุก ${c.name}: เลือกการ์ดทิ้งจ่าย gem ${need}`, src: c,
+        valid: free, okLabel: "จ่าย", auto: (n, l) => { const ok = f.filter(free); return ok.reduce((s, x) => s + this.gemOf(p, x), 0) >= need ? ok : this.payFrom(p, l, need) || l; },
+        after: (cs) => { for (const x of f) p.reserved.delete(x); this.discardMany(p, cs, "ทิ้งจ่าย gem"); } });
+      return true;
+    }
 
     cost(p, c) {
       let red = 0;
@@ -737,7 +831,13 @@
     autoPay(p, cost, exclude) {
       if (cost <= 0) return [];
       const g = (c) => this.gemOf(p, c);
-      const pool = p.hand.filter((c) => c !== exclude && g(c) > 0).sort((a, b) => value(a) / g(a) - value(b) / g(b));
+      return this.payFrom(p, p.hand.filter((c) => c !== exclude && !(p.reserved && p.reserved.has(c))), cost);
+    }
+    // เลือกการ์ดจ่าย gem จากกองที่ให้ (คุ้มสุด แล้วตัดใบที่เกินออก) → [การ์ด] | null ถ้าไม่พอ
+    payFrom(p, list, cost) {
+      if (cost <= 0) return [];
+      const g = (c) => this.gemOf(p, c);
+      const pool = list.filter((c) => g(c) > 0).sort((a, b) => value(a) / g(a) - value(b) / g(b));
       const out = []; let sum = 0;
       for (const c of pool) { out.push(c); sum += g(c); if (sum >= cost) break; }
       if (sum < cost) return null;
@@ -751,8 +851,12 @@
       if (c.sac && p.field.length < c.sac) return `ต้องมีมอนให้สังเวย ${c.sac} ตัว`;
       return null;
     }
-    attachUp(p, c) {
-      const host = p.field.filter((u) => u.kinds.has("เครื่องจักร")).sort((a, b) => this.eff(p, b) - this.eff(p, a))[0];
+    attachUp(p, c) {                                                     // ผู้เล่นเลือกเครื่องจักรที่จะติด · บอท = ตัวแรงสุด
+      const ms = p.field.filter((u) => u.kinds.has("เครื่องจักร"));
+      return this.chooseUnits(p, p, ms, 1, `เลือกเครื่องจักรที่จะติดอัปเกรด ${c.name}`, null, { src: c,
+        after: (sel) => { const host = sel.find((u) => p.field.includes(u)); if (host) this.attachTo(p, c, host); else p.grave.push(c); } });
+    }
+    attachTo(p, c, host) {
       host.power += c.base; host.attached.push(c); for (const g of c.grant) host.kw[g] = true; if (c.h.upScale) host.upScale = true;
       this.log(`🔧 ${c.name} อัปเกรด ${host.name}`); if (host.h.onUpgradeDraw) this.extraDraw(p, host.h.onUpgradeDraw); this.refresh();
     }
@@ -767,12 +871,13 @@
       p.hand.splice(p.hand.indexOf(c), 1);
       for (const x of fodder) this.discard(p, x);
       p.lastFodder = fodder;
-      if (fodder.length >= 2) for (const o of p.field) if (o.h.bigPayKill) for (const t of this.pick(this.other(p), 1, o.h.bigPayKill)) this.kill(this.other(p), t);
+      if (fodder.length >= 2) for (const o of p.field) if (o.h.bigPayKill) { const e = this.other(p); this.chooseUnits(p, e, this.cands(e, 1, o.h.bigPayKill), 1, `เลือกมอนสเตอร์ศัตรูที่ power ≤ ${o.h.bigPayKill} เพื่อทำลาย`, (t) => this.kill(e, t), { src: o.card, self: o }); await this.flush(); }
       if (fodder.length) this.log(`🗑 ${p.name} ทิ้ง ${fodder.map((x) => x.name).join(", ")} (gem ${have})`);
-      if (c.sac) for (const u of [...p.field].sort((a, b) => this.eff(p, a) - this.eff(p, b)).slice(0, c.sac)) { this.kill(p, u); this.sacrificed(p); }
+      if (c.sac) { this.chooseUnits(p, p, [...p.field], c.sac, `เลือกมอนสเตอร์ของเรา ${c.sac} ตัวที่จะสังเวยเพื่ออัญเชิญ`, (u) => { this.kill(p, u); this.sacrificed(p); },
+        { src: c, auto: (need, cs) => [...cs].sort((a, b) => this.eff(p, a) - this.eff(p, b)).slice(0, need) }); await this.flush(); }
       p.played++;
       const up = c.kw["อัปเกรด"] && p.field.some((u) => u.kinds.has("เครื่องจักร"));
-      if (up) this.attachUp(p, c);
+      if (up) { this.attachUp(p, c); await this.flush(); }
       else {
         const u = this.place(p, c, true); u.attacksLeft = this.turn === 1 || c.h.sick ? 0 : Math.max(u.attacksLeft, this.attacksAllowed(p, u));
         const e = this.other(p); let blocked = false;
@@ -781,11 +886,11 @@
           const ch = opts.length ? await react(e, { opts, etb: c }) : null;
           if (ch) { this.emit({ t: "react", id: ch.card.id, by: this.P.indexOf(e) }); e.hand.splice(e.hand.indexOf(ch.card), 1); e.grave.push(ch.card); e.reacted = true; this.log(`✋ ${e.name} ใช้ ${ch.card.name} ยกเลิกสกิลลงสนามของ ${c.name}`); this.counterUsed(e); blocked = true; }
         }
-        if (blocked) { this.checkOmega(p); this.refresh(); } else this.enterFx(p, c, u);
+        if (blocked) { this.checkOmega(p); this.refresh(); } else { this.enterFx(p, c, u); await this.flush(); }
         if (c.offer && over > 0 && p.field.includes(u)) {
           const [k, a] = c.offer, e = this.other(p); this.log(`🙏 เครื่องเซ่น (จ่ายเกิน ${over} gem)`);
           if (k === "powerper") u.power += over; else if (k === "power") u.power += a;
-          else if (k === "killper") for (const t of this.pick(e, Math.min(a, over))) this.kill(e, t);
+          else if (k === "killper") { const n = Math.min(a, over); this.chooseUnits(p, e, this.cands(e, n), n, `เลือกมอนสเตอร์ศัตรู ${n} ตัวเพื่อทำลาย`, (t) => this.kill(e, t), { src: c, self: u }); await this.flush(); }
           else this.run(p, a, c);
         }
       }
@@ -809,13 +914,13 @@
       p.hand.splice(p.hand.indexOf(c), 1); p.grave.push(c); p.played++; p.spellUsed++;
       this.log(`🔮 ${p.name} ใช้เวท ${c.name}`); this.emit({ t: "cast", id: c.id, by: this.P.indexOf(p) });
       const e = this.other(p);
-      if (e.field.some((o) => o.h.spellTax)) { const n = e.field.find((o) => o.h.spellTax).h.spellTax; for (const x of [...p.hand].sort((a, b) => value(a) - value(b)).slice(0, n)) { this.discard(p, x); this.log(`   ${p.name} ต้องทิ้ง ${x.name}`); } }
+      if (e.field.some((o) => o.h.spellTax)) { const n = e.field.find((o) => o.h.spellTax).h.spellTax; this.pickDiscard({ chooser: p, victim: p, n, why: `ต้องทิ้งการ์ด ${n} ใบ (ค่าใช้เวท)`, after: (cs) => this.discardMany(p, cs, "ต้องทิ้ง") }); await this.flush(); }
       if (react && !e.reacted && e.silencedTurn !== this.turn) {
         const opts = e.hand.filter((x) => x.type === "เวทสวน" && x.counter && x.counter[0] === "spell").map((card) => ({ kind: "counter", card }));
         const ch = opts.length ? await react(e, { opts, spell: c }) : null;
         if (ch) { this.emit({ t: "react", id: ch.card.id, by: this.P.indexOf(e) }); e.hand.splice(e.hand.indexOf(ch.card), 1); e.grave.push(ch.card); e.reacted = true; this.log(`✋ ${e.name} ใช้เวทสวน ${ch.card.name} ยกเลิกเวท ${c.name}`); this.counterUsed(e); return null; }
       }
-      this.run(p, c.spell, c);
+      this.run(p, c.spell, c); await this.flush();
       for (const o of [...p.field]) {                                     // ร่ายเวท: สกิลที่ทำงานเมื่อเราใช้เวท
         const h = o.h.onCast; if (!h || !p.field.includes(o)) continue;
         if (h.pow) { if (h.perm) o.power += h.pow; else o.temp += h.pow; }
@@ -1069,7 +1174,7 @@
         case "hatch": { const saved = d.field.filter((x) => x !== t && x.hatch).map((x) => [x, x.hatch[0]]); t.hatch[0] = 1; this.hatch(d); for (const [x, v] of saved) if (x.hatch) x.hatch[0] = v; if (!d.field.includes(t)) return { cancel: true }; return res; }
         case "shield": t.kw["โล่แสง"] = true; return res;
         case "debuff": {
-          for (const c of [...d.hand].sort((x, y) => value(x) - value(y)).slice(0, r.pay)) this.discard(d, c);
+          if (r.pay) this.pickDiscard({ chooser: d, victim: d, n: r.pay, why: `ทิ้งการ์ด ${r.pay} ใบ (ค่าเวทสวน ${choice.card.name})`, after: (cs) => this.discardMany(d, cs, "ทิ้ง") });
           if (r.perm) att.power -= r.n; else att.temp -= r.n; this.log(`   ${att.name} power −${r.n}`);
           if (this.eff(a, att) < 0) { this.kill(a, att); return { cancel: true }; } return res;
         }
@@ -1108,7 +1213,7 @@
       for (const u of p.field) { u.temp2 = 0; u.atkd = false; u.cleaved = false; u.undo = u.undo.filter(([when, fn]) => when !== "start" || (fn(), false)); }
       for (const u of [...p.field]) {                                     // สกิลต้นเทิร์นแบบออร่า/ทริกเกอร์
         const h = u.h;
-        if (h.upkeep) { if (p.hand.length >= h.upkeep) for (const c of [...p.hand].sort((x, y) => value(x) - value(y)).slice(0, h.upkeep)) this.discard(p, c); else { this.log(`${u.name} ทิ้งการ์ดไม่ได้`); this.kill(p, u); continue; } }
+        if (h.upkeep) { if (p.hand.length >= h.upkeep) this.pickDiscard({ chooser: p, victim: p, n: h.upkeep, why: `ต้นเทิร์น ${u.name} ต้องทิ้งการ์ด ${h.upkeep} ใบ`, after: (cs) => this.discardMany(p, cs, "ทิ้ง") }); else { this.log(`${u.name} ทิ้งการ์ดไม่ได้`); this.kill(p, u); continue; } }
         if (h.sotGrow && this.count(p, h.sotGrow.kind, "field", u) > 0 && u.grown < h.sotGrow.cap) { u.power += h.sotGrow.n; u.grown += h.sotGrow.n; }
         if (h.sotScry) this.run(p, [["scry", "self"]]);
         if (u.morph && --u.morph[0] <= 0) { u.power = u.morph[1]; u.kw[u.morph[2]] = true; this.log(`🦋 ${u.name} กลายร่าง (power ${u.power}, ${u.morph[2]})`); u.morph = null; }
