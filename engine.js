@@ -706,7 +706,7 @@
         }
         else if (k === "hatchall") { for (const u of p.field) if (u.hatch) u.hatch[0] = 1; this.hatch(p); }
         else if (k === "awakenall") {                                      // ปลุก N ตัว: เลือกเองว่าตัวไหน (เฉพาะการ์ดหลับใหลในสุสาน)
-          const wake = (c) => { if (p.field.length < FIELD && p.grave.includes(c) && this.payAwaken(p, c)) { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); } };
+          const wake = (c) => { if (p.field.length < FIELD && p.grave.includes(c)) this.payAwaken(p, c, () => { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); }); };
           if (cards(p.grave.filter((c) => c.kw["หลับใหล"]), a[1], `เลือกมังกรโบราณ ${a[1]} ตัวจากสุสานที่จะปลุก`, (l) => l, () => p.grave, wake)) return true;
         }
         else if (k === "own") {
@@ -816,23 +816,24 @@
     // ต้นเทิร์น: มังกรที่ตรงเงื่อนไข + จ่าย gem ไหว + สนามมีที่ → ตื่น · ผู้เล่นคนเลือกเองทีละตัวว่าจะปลุกตัวไหน (ไม่ปลุกก็ได้)
     awakenCheck(p) {
       const ready = () => p.field.length < FIELD ? p.grave.filter((c) => c.kw["หลับใหล"] && c.awaken && this.awakenOk(p, c) && this.autoPay(p, c.awakenGem, null) != null) : [];
-      const wake = (c) => { if (p.field.length < FIELD && p.grave.includes(c) && this.payAwaken(p, c)) { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); this.log(`🐉 ${c.name} ตื่นจากสุสาน`); } };
+      const wake = (c, next) => { if (p.field.length < FIELD && p.grave.includes(c)) this.payAwaken(p, c, () => { p.grave.splice(p.grave.indexOf(c), 1); this.place(p, c); this.log(`🐉 ${c.name} ตื่นจากสุสาน`); if (next) next(); }); };
       if (!this.picker || !this.picker(p)) { for (const c of p.grave.filter((c) => c.kw["หลับใหล"] && c.awaken)) if (this.awakenOk(p, c)) { const n0 = p.field.length; wake(c); if (this.opt.awakenOne && p.field.length > n0) return; } return; }
       const rs = ready(); if (!rs.length) return;
       this.choose({ kind: "card", chooser: p, cands: rs, n: 1, optional: true, why: `มังกรพร้อมตื่น: เลือกตัวที่จะปลุก (จ่าย gem ${rs[0].awakenGem})`, sub: "แตะมังกรที่จะปลุก แล้วเลือกการ์ดจ่าย gem · หรือกดไม่ปลุก",
         okLabel: "ปลุก", skipLabel: "ไม่ปลุก", valid: (c) => p.grave.includes(c) && p.field.length < FIELD,
-        auto: (n, l) => l.slice(0, n), after: (cs) => { if (!cs.length) return; wake(cs[0]); if (!this.opt.awakenOne) this.awakenCheck(p); } });   // opt.awakenOne (ทดลอง): ปลุกได้ 1 ตัวต่อเทิร์น
+        auto: (n, l) => l.slice(0, n), after: (cs) => { if (!cs.length) return; wake(cs[0], () => { if (!this.opt.awakenOne) this.awakenCheck(p); }); } });   // opt.awakenOne (ทดลอง): ปลุกได้ 1 ตัวต่อเทิร์น
     }
-    payAwaken(p, c) {
+    // จ่าย gem ปลุก แล้วค่อยลงสนาม (then) · คน: เลือกการ์ดจ่ายเองก่อน มังกรขึ้นสนามหลังจ่าย · จ่ายไม่ไหว = false
+    payAwaken(p, c, then) {
       const f = this.autoPay(p, c.awakenGem, null); if (f == null) return false;
-      if (!this.picker || !this.picker(p)) { for (const x of f) this.discard(p, x); return true; }
-      // คน: ปลุกเลย แล้วเลือกการ์ดจ่าย gem เอง (กันการ์ดชุดที่จะจ่ายไว้ ไม่ให้การปลุกตัวอื่นนับซ้ำ)
+      if (!this.picker || !this.picker(p)) { for (const x of f) this.discard(p, x); then(); return true; }
       p.reserved = p.reserved || new Set(); for (const x of f) p.reserved.add(x);
       const need = c.awakenGem, mineRes = new Set(f);
       const free = (x) => p.hand.includes(x) && (!p.reserved.has(x) || mineRes.has(x));
       this.choose({ kind: "card", chooser: p, gem: need, cands: p.hand.filter((x) => free(x) && this.gemOf(p, x) > 0), n: 1, why: `ปลุก: เลือกการ์ดทิ้งจ่าย gem ${need}`, src: c,
         valid: free, okLabel: "จ่าย", auto: (n, l) => { const ok = f.filter(free); return ok.reduce((s, x) => s + this.gemOf(p, x), 0) >= need ? ok : this.payFrom(p, l, need) || l; },
-        after: (cs) => { for (const x of f) p.reserved.delete(x); this.discardMany(p, cs, "ทิ้งจ่าย gem"); } });
+        after: (cs) => { for (const x of f) p.reserved.delete(x); if (!p.grave.includes(c) || p.field.length >= FIELD) return;   // ระหว่างรอ มังกรหาย/สนามเต็ม = ไม่จ่าย
+          this.discardMany(p, cs, "ทิ้งจ่าย gem"); then(); } });
       return true;
     }
 
