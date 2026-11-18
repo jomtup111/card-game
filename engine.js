@@ -336,7 +336,7 @@
         if (part.startsWith("รวมชิ้นส่วนไททัน") || part.startsWith("อัญเชิญชิ้นส่วนไททันทุกชนิด")) { out.push(["titan", part.includes("อัญเชิญ")]); continue; }
         if (/^ไข่ฝั่งเรา 1 ฟองฟักทันที.*$/.test(part)) { out.push(["hatchone"]); continue; }   // 1 ฟอง = เลือกฟองเดียว (เดิมฟักทุกฟอง)
         if (/^ไข่(?:ทุกฟอง)?ฝั่งเรา(?: 1 ฟอง)?ฟักทันที.*$/.test(part)) { out.push(["hatchall"]); continue; }
-        if ((m = part.match(/^(?:ปลุก|อัญเชิญ)มังกรโบราณ(ทุกตัว| 1 ตัว)จากสุสาน.*$/))) { out.push(["awakenall", m[1].includes("ทุก") ? 99 : 1, /สุสานฟรี/.test(part)]); continue; }
+        if ((m = part.match(/^(?:ปลุก|อัญเชิญ)มังกรโบราณ(ทุกตัว| \d+ ตัว)จากสุสาน.*$/))) { out.push(["awakenall", m[1].includes("ทุก") ? 99 : +m[1].match(/\d+/)[0], /สุสานฟรี/.test(part)]); continue; }
         return [];
       }
       return out;
